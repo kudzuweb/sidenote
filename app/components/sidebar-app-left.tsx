@@ -21,6 +21,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "~/components/ui/tooltip";
+import { cn } from "~/lib/utils";
 import DocumentList from "./document/DocumentList";
 import GroupList from "./group/GroupList";
 import { GroupModal } from "./group/GroupModal";
@@ -34,6 +35,21 @@ type UIMessagePart = { type: string; text?: string }
 type UIMessage = { role: string; parts: UIMessagePart[] }
 type UserInfo = { name: string; email: string; avatar: string; fallback: string }
 type SidebarAppProps = { setTheme: React.Dispatch<React.SetStateAction<"light" | "dark" >>; theme: "light" | "dark"; data: any; user: UserInfo; side: "left" | "right" } & ComponentProps<typeof Sidebar>
+
+const iconButtonClasses =
+  "rounded-lg border border-transparent bg-[#121027]/80 text-[#8ffcff]/80 transition-all duration-200 ease-out hover:border-[#ff5688]/70 hover:bg-[#1c173a]/90 hover:text-white focus-visible:ring-2 focus-visible:ring-[#71fff6]/40 focus-visible:ring-offset-1 focus-visible:ring-offset-[#070314]";
+
+const inputShellClasses =
+  "rounded-lg border border-[#343065]/70 bg-[#050711]/90 px-3 py-2 font-mono text-xs tracking-[0.08em] text-[#d9dcff]/80 placeholder:text-[#667199]/70 transition-colors focus:border-[#6efff4]/60 focus:outline-none focus:ring-2 focus:ring-[#6efff4]/25";
+
+const secondaryPanelClasses =
+  "rounded-xl border border-[#26224a]/70 bg-[#0b0618]/80 p-3 shadow-[0_12px_30px_rgba(10,0,28,0.35)]";
+
+const sectionTitleClasses =
+  "font-mono text-[0.7rem] uppercase tracking-[0.24em] text-[#8ffcff]/70";
+
+const tabTriggerClasses =
+  "flex h-10 w-10 items-center justify-center rounded-lg border border-transparent bg-[#121027]/70 text-[#8ffcff]/80 transition-all duration-200 ease-out hover:border-[#71fff6]/60 hover:text-white focus-visible:ring-2 focus-visible:ring-[#71fff6]/40 focus-visible:ring-offset-1 focus-visible:ring-offset-[#070314] data-[state=active]:border-[#ff5688]/70 data-[state=active]:bg-[#150c32]/90 data-[state=active]:text-white";
 
 export function SidebarApp({ side, setTheme, theme, data, user, ...props }: SidebarAppProps) {
   const [mode, setMode] = useState("document")
@@ -63,7 +79,6 @@ export function SidebarApp({ side, setTheme, theme, data, user, ...props }: Side
     if (data?.document) setDocumentId(data.document.id)
     if (data?.documents) setDocuments(data.documents)
     if (data?.groups) setGroups(data.groups)
-    console.log(data)
   }, [data])
   
 
@@ -114,24 +129,33 @@ export function SidebarApp({ side, setTheme, theme, data, user, ...props }: Side
             {new URLSearchParams(location.search).get("message")}
           </div>
         )}
-        <Tabs defaultValue="tab-1" className="items-center">
-          <div className="flex w-full items-center justify-between">
-            <Button size="icon" variant="ghost" onClick={() => {
-              setGroupId(null)
-              setDocumentId(null)
-            }}>
+        <Tabs defaultValue="tab-1" className="items-center gap-4 text-[#d9dcff]/80">
+          <div className="flex w-full items-center justify-between gap-3">
+            <Button
+              size="icon"
+              variant="ghost"
+              className={iconButtonClasses}
+              onClick={() => {
+                setGroupId(null)
+                setDocumentId(null)
+              }}
+            >
               <ArrowLeft className="h-5 w-5" />
               <span className="sr-only">Back</span>
             </Button>
-            <TabsList>
+            <TabsList className="flex items-center gap-2 rounded-xl border border-[#2a2850]/70 bg-[#090417]/80 p-1 shadow-[0_12px_30px_rgba(8,0,25,0.35)]">
               <Tooltip>
                 <TooltipTrigger asChild>
                   <span>
-                    <TabsTrigger value="tab-1" className="py-3" onClick={() => {
-                      setMode("document")
-                      setGroupId(null)
-                      setDocumentId(null)
-                    }}>
+                    <TabsTrigger
+                      value="tab-1"
+                      className={tabTriggerClasses}
+                      onClick={() => {
+                        setMode("document")
+                        setGroupId(null)
+                        setDocumentId(null)
+                      }}
+                    >
                       <Library size={16} aria-hidden="true" />
                     </TabsTrigger>
                   </span>
@@ -143,11 +167,15 @@ export function SidebarApp({ side, setTheme, theme, data, user, ...props }: Side
               <Tooltip>
                 <TooltipTrigger asChild>
                   <span>
-                    <TabsTrigger value="tab-2" className="group py-3" onClick={() => {
-                      setMode("group")
-                      setGroupId(null)
-                      setDocumentId(null)
-                    }}>
+                    <TabsTrigger
+                      value="tab-2"
+                      className={cn(tabTriggerClasses, "group")}
+                      onClick={() => {
+                        setMode("group")
+                        setGroupId(null)
+                        setDocumentId(null)
+                      }}
+                    >
                       <span className="relative">
                         <Users size={16} aria-hidden="true" />
                       </span>
@@ -161,10 +189,15 @@ export function SidebarApp({ side, setTheme, theme, data, user, ...props }: Side
             </TabsList>
             <Tooltip>
               <TooltipTrigger>
-                <Button size="icon" variant="ghost" onClick={() => {
-                  setEditingGroup(null);
-                  setIsModalOpen(true);
-                }}>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className={iconButtonClasses}
+                  onClick={() => {
+                    setEditingGroup(null);
+                    setIsModalOpen(true);
+                  }}
+                >
                   <UserPlus className="h-5 w-5" />
                   <span className="sr-only">Create New Group</span>
                 </Button>
@@ -182,62 +215,100 @@ export function SidebarApp({ side, setTheme, theme, data, user, ...props }: Side
           </div>
           <TabsContent value="tab-1">
             <div className="flex items-center gap-2">
-              <span className="text-md font-semibold">Reads</span>
+              <span className={sectionTitleClasses}>Reads Circuit</span>
             </div>
           </TabsContent>
           <TabsContent value="tab-2">
             <div className="flex items-center gap-2">
-              <span className="text-md font-semibold">Groups</span>
+              <span className={sectionTitleClasses}>Collective Mesh</span>
             </div>
           </TabsContent>
         </Tabs>
       </SidebarHeader>
       <SidebarContent>
-        <fetcher.Form method="get" action="/workspace/document-search" onSubmit={handleSearchSubmit}>
-          <div className="flex items-center justify-between">
-            <input className="text-xs py-2 pl-4 pr-2" type="text" name="query" placeholder="Search" value={query} onChange={(e) => { setQuery(e.target.value) }} />
-            {searchResults.length > 0 ?
-              <>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button size="icon" variant="ghost" onClick={() => {
+        <fetcher.Form
+          method="get"
+          action="/workspace/document-search"
+          className="space-y-3"
+          onSubmit={handleSearchSubmit}
+        >
+          <div className={cn(secondaryPanelClasses, "flex items-center gap-3")}>
+            <input
+              className={cn(inputShellClasses, "w-full flex-1")}
+              type="text"
+              name="query"
+              placeholder="Search Signal"
+              value={query}
+              onChange={(e) => {
+                setQuery(e.target.value)
+              }}
+            />
+            {searchResults.length > 0 ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className={cn(iconButtonClasses, "shrink-0")}
+                    onClick={() => {
                       setSearchResults([])
                       setMode("group")
                       setQuery("")
-                    }}>
-                      <SearchX className="h-5 w-5" />
-                      <span className="sr-only">Clear Search</span>
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Clear Search</p>
-                  </TooltipContent>
-                </Tooltip>
-              </>
-              :
-              <>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button size="icon" variant="ghost" type="submit">
-                      <Search className="h-5 w-5" />
-                      <span className="sr-only">Search</span>
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Search</p>
-                  </TooltipContent>
-                </Tooltip>
-              </>
-            }
-          </div>
-        </fetcher.Form>
-        <Form method="post" action="document-create" onSubmit={handleNewDocSubmit} autoComplete="off">
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <input className="text-xs py-2 pl-4 pr-2" type="text" name="url" value={url} onInput={handleUrlInput} placeholder="Add Read by URL" />
+                    }}
+                  >
+                    <SearchX className="h-5 w-5" />
+                    <span className="sr-only">Clear Search</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Clear Search</p>
+                </TooltipContent>
+              </Tooltip>
+            ) : (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button size="icon" variant="ghost" type="submit">
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    type="submit"
+                    className={cn(iconButtonClasses, "shrink-0")}
+                  >
+                    <Search className="h-5 w-5" />
+                    <span className="sr-only">Search</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Search</p>
+                </TooltipContent>
+              </Tooltip>
+            )}
+          </div>
+        </fetcher.Form>
+        <Form
+          method="post"
+          action="document-create"
+          onSubmit={handleNewDocSubmit}
+          autoComplete="off"
+          className="space-y-3"
+        >
+          <div className={cn(secondaryPanelClasses, "flex flex-col gap-3")}>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <input
+                className={cn(inputShellClasses, "flex-1")}
+                type="text"
+                name="url"
+                value={url}
+                onInput={handleUrlInput}
+                placeholder="Beam in via URL"
+              />
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    type="submit"
+                    className={cn(iconButtonClasses, "shrink-0")}
+                  >
                     <FilePlus2 className="h-5 w-5" />
                     <span className="sr-only">Add Read</span>
                   </Button>
@@ -247,13 +318,27 @@ export function SidebarApp({ side, setTheme, theme, data, user, ...props }: Side
                 </TooltipContent>
               </Tooltip>
             </div>
-            <div className="flex items-center justify-between gap-2">
-              <label className="flex items-center gap-2 text-xs">
-                <input type="checkbox" name="crawl" />
+            <div className="flex flex-wrap items-center justify-between gap-3 text-[#8ffcff]/70">
+              <label className="flex items-center gap-2 font-mono text-[0.65rem] tracking-[0.12em] uppercase">
+                <input
+                  type="checkbox"
+                  name="crawl"
+                  className="size-4 rounded border border-[#343065]/70 bg-[#050711]/90 accent-[#ff5688] focus:outline-none focus:ring-2 focus:ring-[#6efff4]/30"
+                />
                 Crawl site
               </label>
-              <input className="text-xs py-1 px-2 w-20" type="number" name="maxPages" min={1} max={200} placeholder="25" />
-              <select name="splitMode" className="text-xs py-1 px-2">
+              <input
+                className={cn(inputShellClasses, "w-24 text-center")}
+                type="number"
+                name="maxPages"
+                min={1}
+                max={200}
+                placeholder="25"
+              />
+              <select
+                name="splitMode"
+                className={cn(inputShellClasses, "w-48 bg-[#050711]/90 text-xs")}
+              >
                 <option value="aggregate">One document</option>
                 <option value="split">One per page</option>
               </select>
@@ -268,7 +353,7 @@ export function SidebarApp({ side, setTheme, theme, data, user, ...props }: Side
           <SidebarGroup>
             {searchResults.length > 0 ?
               <>
-                <SidebarGroupLabel>Search Results</SidebarGroupLabel>
+                <SidebarGroupLabel>Signal Scan</SidebarGroupLabel>
                 <SidebarMenu>
                   <SearchResultList results={searchResults} />
                 </SidebarMenu>
@@ -276,14 +361,14 @@ export function SidebarApp({ side, setTheme, theme, data, user, ...props }: Side
               :
               mode === "document" ?
                 <>
-                  <SidebarGroupLabel>Recent</SidebarGroupLabel>
+                  <SidebarGroupLabel>Recent Transmission</SidebarGroupLabel>
                   <SidebarMenu>
                     <DocumentList documents={documents} />
                   </SidebarMenu>
                 </>
                 : mode === "group" &&
                 <>
-                  <SidebarGroupLabel>Recent</SidebarGroupLabel>
+                  <SidebarGroupLabel>Collective Nodes</SidebarGroupLabel>
                   <SidebarMenu>
                     <Accordion type="single" collapsible className="w-full" defaultValue="3">
                       <GroupList groups={groups} onEditGroup={handleEditGroup} />
