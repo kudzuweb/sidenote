@@ -37,17 +37,23 @@ export async function extractMainFromHtml(html: string, url: string): Promise<Ex
 
 export async function extractMainFromUrl(url: string): Promise<ExtractedContent | null> {
   try {
-    const res = await fetch(url)
+    let normalizedUrl: string;
+    try {
+      normalizedUrl = new URL(url).toString();
+    } catch (urlError) {
+      console.warn("[extractor] invalid url provided", { url, urlError });
+      return null;
+    }
+    const res = await fetch(normalizedUrl)
     if (!res.ok) {
       console.warn("[extractor] fetch non-200", { url, status: res.status })
       return null
     }
     const html = await res.text()
-    return extractMainFromHtml(html, url)
+    return extractMainFromHtml(html, normalizedUrl)
   } catch (err) {
     console.error("[extractor] fetch error", { url, err })
     return null
   }
 }
-
 
