@@ -21,6 +21,13 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "~/components/ui/tooltip";
+import {
+  iconButtonClasses,
+  inputShellClasses,
+  secondaryPanelClasses,
+  sectionTitleClasses,
+  tabTriggerClasses,
+} from "~/components/ui/sidebar-theme";
 import { cn } from "~/lib/utils";
 import DocumentList from "./document/DocumentList";
 import GroupList from "./group/GroupList";
@@ -35,21 +42,6 @@ type UIMessagePart = { type: string; text?: string }
 type UIMessage = { role: string; parts: UIMessagePart[] }
 type UserInfo = { name: string; email: string; avatar: string; fallback: string }
 type SidebarAppProps = { setTheme: React.Dispatch<React.SetStateAction<"light" | "dark" >>; theme: "light" | "dark"; data: any; user: UserInfo; side: "left" | "right" } & ComponentProps<typeof Sidebar>
-
-const iconButtonClasses =
-  "rounded-lg border border-transparent bg-[#121027]/80 text-[#8ffcff]/80 transition-all duration-200 ease-out hover:border-[#ff5688]/70 hover:bg-[#1c173a]/90 hover:text-white focus-visible:ring-2 focus-visible:ring-[#71fff6]/40 focus-visible:ring-offset-1 focus-visible:ring-offset-[#070314]";
-
-const inputShellClasses =
-  "rounded-lg border border-[#343065]/70 bg-[#050711]/90 px-3 py-2 font-mono text-xs tracking-[0.08em] text-[#d9dcff]/80 placeholder:text-[#667199]/70 transition-colors focus:border-[#6efff4]/60 focus:outline-none focus:ring-2 focus:ring-[#6efff4]/25";
-
-const secondaryPanelClasses =
-  "rounded-xl border border-[#26224a]/70 bg-[#0b0618]/80 p-3 shadow-[0_12px_30px_rgba(10,0,28,0.35)]";
-
-const sectionTitleClasses =
-  "font-mono text-[0.7rem] uppercase tracking-[0.24em] text-[#8ffcff]/70";
-
-const tabTriggerClasses =
-  "flex h-10 w-10 items-center justify-center rounded-lg border border-transparent bg-[#121027]/70 text-[#8ffcff]/80 transition-all duration-200 ease-out hover:border-[#71fff6]/60 hover:text-white focus-visible:ring-2 focus-visible:ring-[#71fff6]/40 focus-visible:ring-offset-1 focus-visible:ring-offset-[#070314] data-[state=active]:border-[#ff5688]/70 data-[state=active]:bg-[#150c32]/90 data-[state=active]:text-white";
 
 export function SidebarApp({ side, setTheme, theme, data, user, ...props }: SidebarAppProps) {
   const [mode, setMode] = useState("document")
