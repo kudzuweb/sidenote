@@ -13,10 +13,11 @@ import DocumentContents from "~/components/document/DocumentContents";
 import { NotePopover } from "~/components/document/NotePopover";
 import { getColorFromID } from "~/server/users.server";
 import type { Annotation } from "~/types/types";
+import PdfViewer from "~/components/document/PdfViewer";
 
 
 type LoaderData = {
-  document: { id: string; content: string, title: string };
+  document: { id: string; content: string; title: string; url?: string | null };
   color: string,
   annotations: Annotation[];
 };
@@ -63,6 +64,7 @@ export default function Document() {
   const docContent = () => {
     return { __html: document.content };
   };
+  const isPdf = typeof document.url === "string" && /\.pdf$/i.test(document.url);
   const [annotationJson, setAnnotationJson] = useState("");
   const [rerenderToShowHighlight, setRerenderToShowHighlight] = useState(0);
   const [annotationText, setannotationText] = useState("");
@@ -223,15 +225,20 @@ export default function Document() {
 
       <div
         id="doc-container"
+        className=""
         onMouseUp={handleSelectionEnd}
         onClick={handleDocClick}
         style={{ userSelect: "text" }}
       >
-        <DocumentContents
-          documentHTML={docContent()}
-          annotations={[...annotations]}
-          theme={theme}
-        />
+        {isPdf ? (
+          <PdfViewer src={document.url!} annotations={[...annotations]} theme={theme} />
+        ) : (
+          <DocumentContents
+            documentHTML={docContent()}
+            annotations={[...annotations]}
+            theme={theme}
+          />
+        )}
       </div>
     </>
   );
