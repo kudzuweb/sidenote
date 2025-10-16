@@ -17,9 +17,17 @@ export async function action({ request }: ActionFunctionArgs) {
   if (!url || url.length < 1) {
     throw redirect("/workspace")
   }
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(url);
+  } catch (error) {
+    console.warn("[document-create] invalid url submitted", { url, error });
+    throw redirect(`/workspace?message=${encodeURIComponent("Enter a valid URL before importing.")}`)
+  }
+  const normalizedUrl = parsedUrl.toString()
 
   if (crawl) {
-    const pages = await crawlSite(url, { maxPages, sameHostOnly: true })
+    const pages = await crawlSite(normalizedUrl, { maxPages, sameHostOnly: true })
     if (!pages || pages.length === 0) {
       console.warn("[action] crawl returned no pages", { url, maxPages })
       throw redirect(`/workspace?message=${encodeURIComponent("No pages extracted. Check the URL or try fewer restrictions.")}`)
@@ -63,7 +71,7 @@ export async function action({ request }: ActionFunctionArgs) {
       const documentId = crypto.randomUUID()
       await saveDocument({
         id: documentId,
-        url,
+        url: normalizedUrl,
         title: pages[0]?.title ?? "Untitled Document",
         content: "",
         textContent: allText,
@@ -83,7 +91,7 @@ export async function action({ request }: ActionFunctionArgs) {
     }
   }
 
-  const article = await extractMainFromUrl(url)
+  const article = await extractMainFromUrl(normalizedUrl)
   if (!article) return
 
   const rawText = article.textContent
@@ -107,7 +115,7 @@ export async function action({ request }: ActionFunctionArgs) {
   const documentId = crypto.randomUUID()
   const document = {
     id: documentId,
-    url: url,
+    url: normalizedUrl,
     title: article.title ?? "Untitled Document",
     content: article.content ?? "",
     textContent: article.textContent,

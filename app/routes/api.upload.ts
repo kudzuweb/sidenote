@@ -1,13 +1,17 @@
 import { EPub } from 'epub2';
-import { mkdir, unlink, writeFile } from "fs/promises";
+import { unlink, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 import { redirect, type ActionFunctionArgs } from "react-router";
 import { requireUser } from "~/server/auth.server";
-import { saveDocument } from "~/server/documents.server";
+import { saveDocument, saveDocumentChunks } from "~/server/documents.server";
 import { fileTypeFromBuffer } from "file-type";
 import type { DocumentCreate } from "~/types/types";
 import { supabaseAdmin } from "~/server/supabase.server";
+import { chunkText, generateEmbeddings } from "~/server/document.server";
+import { extractPdfText, PdfExtractionError } from "~/server/pdf-extractor.server";
+
+const MAX_UPLOAD_BYTES = 15 * 1024 * 1024; // 15 MB
 
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -16,7 +20,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
     const file = form.get('file') as File | null;
     if (!file) throw new Response("missing file", { status: 400 });
-    if (file.size > 5 * 1024 * 1024) throw new Response("file too large", { status: 413 });
+    if (file.size > MAX_UPLOAD_BYTES) throw new Response("file too large", { status: 413 });
 
     const buffer = Buffer.from(await file.arrayBuffer());
     const detected = await fileTypeFromBuffer(buffer);
@@ -24,6 +28,33 @@ export async function action({ request }: ActionFunctionArgs) {
     const isEpub = detected?.mime === "application/epub+zip" || /\.epub$/i.test(file.name ?? "");
 
     if (isPdf) {
+        let pdfText: string;
+        try {
+          const parsed = await extractPdfText(buffer);
+          pdfText = parsed.text;
+        } catch (error) {
+          if (error instanceof PdfExtractionError) {
+            console.warn("[api.upload] pdf text extraction failed", { message: error.message });
+            throw new Response("Could not extract text from this PDF. It may be scanned or protected.", { status: 422 });
+          }
+          console.error("[api.upload] unexpected pdf extraction error", error);
+          throw new Response("Unexpected error while processing PDF", { status: 500 });
+        }
+
+        const chunkedDocs = await chunkText(pdfText);
+        if (chunkedDocs.length === 0) {
+          throw new Response("PDF contained no readable text", { status: 422 });
+        }
+        const chunkTexts = chunkedDocs.map(doc => doc.pageContent);
+
+        let embeddings: number[][] | Float32Array[];
+        try {
+          embeddings = await generateEmbeddings(chunkTexts);
+        } catch (error) {
+          console.error("[api.upload] embedding generation failed", error);
+          throw new Response("Failed to generate embeddings for this PDF", { status: 500 });
+        }
+
         const documentId = crypto.randomUUID();
         const filename = `${documentId}.pdf`;
         const bucket = process.env.SUPABASE_BUCKET || "documents";
@@ -47,12 +78,21 @@ export async function action({ request }: ActionFunctionArgs) {
             url: publicUrl,
             title: (file.name || "Untitled PDF").replace(/\.[^/.]+$/, ""),
             content: "",
-            textContent: null,
+            textContent: pdfText,
             publishedTime: null,
             createdAt: now,
             updatedAt: now,
         };
         await saveDocument(document);
+
+        const documentChunks = chunkedDocs.map((doc, index) => ({
+          id: crypto.randomUUID(),
+          documentId,
+          text: doc.pageContent,
+          chunkIndex: index,
+          embedding: embeddings[index],
+        }));
+        await saveDocumentChunks(documentChunks);
 
         return redirect(`/workspace/document/${documentId}`);
     }
