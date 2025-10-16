@@ -87,6 +87,18 @@ mark.anno-mark.is-selected {
   background: rgba(255, 215, 64, 0.35);
 }
 
+
+/* pdf.js expects content-box sizing for its internal layers */
+.pdfViewer,
+.pdfViewer .page,
+.pdfViewer .canvasWrapper,
+.pdfViewer .canvasWrapper canvas,
+.pdfViewer .textLayer,
+.pdfViewer .annotationLayer,
+.pdfViewer .svgLayer {
+  box-sizing: content-box;
+}
+
 html,
 body {
   @apply bg-white dark:bg-gray-950;
