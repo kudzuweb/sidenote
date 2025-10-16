@@ -18,7 +18,20 @@ declare global {
 
 type PdfJsModules = { pdfjsLib: any; pdfjsViewer: any };
 
-const SCALE_EPSILON = 0.0005;
+const PDF_DEBUG = false;
+
+function isDebugEnabled(): boolean {
+  if (!PDF_DEBUG) return false;
+  if (typeof window === "undefined") return false;
+  if ((window as any).__PDF_DEBUG__ === false) return false;
+  return true;
+}
+
+function debugLog(...args: any[]) {
+  if (!isDebugEnabled()) return;
+  // eslint-disable-next-line no-console
+  console.log(...args);
+}
 
 let pdfjsModulesPromise: Promise<PdfJsModules> | null = null;
 let workerConfigured = false;
@@ -54,63 +67,6 @@ async function loadPdfJs(): Promise<PdfJsModules> {
   return pdfjsModulesPromise;
 }
 
-function matrixToCss(matrix: DOMMatrix): string {
-  if (
-    matrix.a === 1 &&
-    matrix.b === 0 &&
-    matrix.c === 0 &&
-    matrix.d === 1 &&
-    matrix.e === 0 &&
-    matrix.f === 0
-  ) {
-    return "";
-  }
-  return `matrix(${matrix.a},${matrix.b},${matrix.c},${matrix.d},${matrix.e},${matrix.f})`;
-}
-
-function alignTextLayers(rootEl: HTMLElement) {
-  if (typeof DOMMatrix === "undefined") return;
-
-  const pages = rootEl.querySelectorAll<HTMLElement>(".page");
-  pages.forEach((page) => {
-    const textLayer = page.querySelector<HTMLElement>(".textLayer");
-    const canvasWrapper = page.querySelector<HTMLElement>(".canvasWrapper");
-    if (!textLayer || !canvasWrapper) return;
-
-    const textWidth = textLayer.clientWidth;
-    const textHeight = textLayer.clientHeight;
-    const canvasWidth = canvasWrapper.clientWidth;
-    const canvasHeight = canvasWrapper.clientHeight;
-    if (!textWidth || !textHeight || !canvasWidth || !canvasHeight) return;
-
-    const scaleX = canvasWidth / textWidth;
-    const scaleY = canvasHeight / textHeight;
-    const needsScale =
-      Math.abs(scaleX - 1) > SCALE_EPSILON ||
-      Math.abs(scaleY - 1) > SCALE_EPSILON;
-
-    if (!textLayer.dataset.fractalBaseTransform) {
-      const computed = window.getComputedStyle(textLayer).transform;
-      textLayer.dataset.fractalBaseTransform =
-        computed && computed !== "none" ? computed : "";
-    }
-
-    const baseMatrix = new DOMMatrix(
-      textLayer.dataset.fractalBaseTransform || undefined
-    );
-    const correctedMatrix = needsScale
-      ? baseMatrix.scale(scaleX, scaleY)
-      : baseMatrix;
-    const css = matrixToCss(correctedMatrix);
-
-    if (textLayer.dataset.fractalAppliedTransform !== css) {
-      textLayer.style.transformOrigin = css ? "0 0" : "";
-      textLayer.style.transform = css;
-      textLayer.dataset.fractalAppliedTransform = css;
-    }
-  });
-}
-
 function getElementScale(el: HTMLElement) {
   try {
     const computed = window.getComputedStyle(el).transform;
@@ -127,7 +83,98 @@ function getElementScale(el: HTMLElement) {
   }
 }
 
+type SnapshotInfo = {
+  label: string;
+  event?: any;
+  container: HTMLElement;
+  viewer: any;
+};
+
+function logLayerSnapshot({ label, event, container, viewer }: SnapshotInfo) {
+  if (!isDebugEnabled()) return;
+  try {
+    const scale =
+      typeof viewer?.currentScale === "number"
+        ? viewer.currentScale
+        : viewer?._currentScale;
+    const scaleValue = viewer?.currentScaleValue;
+    const pages = Array.from(
+      container.querySelectorAll<HTMLElement>(".page")
+    );
+    const rows = pages.map((page, index) => {
+      const canvasWrapper = page.querySelector<HTMLElement>(".canvasWrapper");
+      const textLayer = page.querySelector<HTMLElement>(".textLayer");
+      const canvasRect = canvasWrapper?.getBoundingClientRect();
+      const textRect = textLayer?.getBoundingClientRect();
+      const canvasStyles = canvasWrapper
+        ? window.getComputedStyle(canvasWrapper)
+        : null;
+      const textStyles = textLayer ? window.getComputedStyle(textLayer) : null;
+      const pageNumber = page.dataset.pageNumber
+        ? Number(page.dataset.pageNumber)
+        : index + 1;
+      const widthDiff =
+        canvasRect && textRect
+          ? Number((textRect.width - canvasRect.width).toFixed(2))
+          : null;
+      const heightDiff =
+        canvasRect && textRect
+          ? Number((textRect.height - canvasRect.height).toFixed(2))
+          : null;
+      const widthRatio =
+        canvasRect && textRect && canvasRect.width !== 0
+          ? Number((textRect.width / canvasRect.width).toFixed(4))
+          : null;
+      const heightRatio =
+        canvasRect && textRect && canvasRect.height !== 0
+          ? Number((textRect.height / canvasRect.height).toFixed(4))
+          : null;
+      return {
+        page: pageNumber,
+        canvasW: canvasRect ? Number(canvasRect.width.toFixed(2)) : null,
+        canvasH: canvasRect ? Number(canvasRect.height.toFixed(2)) : null,
+        textW: textRect ? Number(textRect.width.toFixed(2)) : null,
+        textH: textRect ? Number(textRect.height.toFixed(2)) : null,
+        widthDiff,
+        heightDiff,
+        widthRatio,
+        heightRatio,
+        canvasTransform: canvasStyles?.transform ?? "none",
+        textTransform: textStyles?.transform ?? "none",
+        textOrigin: textStyles?.transformOrigin ?? "",
+      };
+    });
+    // eslint-disable-next-line no-console
+    console.groupCollapsed(
+      `[PdfViewer][${label}] scale=${scale}, scaleValue=${scaleValue}`
+    );
+    if (event) {
+      // eslint-disable-next-line no-console
+      console.log("event", event);
+    }
+    // eslint-disable-next-line no-console
+    console.table(rows);
+    // eslint-disable-next-line no-console
+    console.log("container metrics", {
+      clientWidth: container.clientWidth,
+      clientHeight: container.clientHeight,
+      scrollWidth: container.scrollWidth,
+      scrollHeight: container.scrollHeight,
+    });
+    // eslint-disable-next-line no-console
+    console.groupEnd();
+  } catch (error) {
+    debugLog("[PdfViewer] logLayerSnapshot error", error);
+  }
+}
+
 function drawOverlayHighlights(rootEl: HTMLElement, annsAll: Annotation[]) {
+  if (isDebugEnabled()) {
+    debugLog("[PdfViewer] drawOverlayHighlights:start", {
+      annotationsCount: annsAll?.length ?? 0,
+      existingHighlights: rootEl.querySelectorAll(".pdfOverlayHighlight").length,
+    });
+  }
   rootEl.querySelectorAll(".pdfOverlayLayer").forEach((el) => {
     (el as HTMLElement).innerHTML = "";
   });
@@ -285,6 +332,13 @@ function drawOverlayHighlights(rootEl: HTMLElement, annsAll: Annotation[]) {
     }
     if (cursor < full.length) drawSegment(cursor, full.length, active);
   }
+
+  if (isDebugEnabled()) {
+    debugLog("[PdfViewer] drawOverlayHighlights:end", {
+      pageCount: rootEl.querySelectorAll(".page").length,
+      highlightCount: rootEl.querySelectorAll(".pdfOverlayHighlight").length,
+    });
+  }
 }
 
 export default function PdfViewer({
@@ -295,62 +349,120 @@ export default function PdfViewer({
   const containerRef = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<any>(null);
   const cleanupRef = useRef<() => void>(() => {});
-  const resizeObserverRef = useRef<ResizeObserver | null>(null);
   const annotationsRef = useRef<Annotation[]>(annotations);
   const [error, setError] = useState<string | null>(null);
 
+  const snapshot = (label: string, event?: any) => {
+    const container = containerRef.current;
+    const viewer = viewerRef.current;
+    if (!container || !viewer) {
+      if (isDebugEnabled()) {
+        debugLog("[PdfViewer] snapshot skipped", {
+          label,
+          hasContainer: !!container,
+          hasViewer: !!viewer,
+        });
+      }
+      return;
+    }
+    logLayerSnapshot({ label, event, container, viewer });
+  };
+
   useEffect(() => {
+    if (isDebugEnabled()) {
+      debugLog("[PdfViewer] annotations changed", {
+        count: annotations?.length ?? 0,
+      });
+    }
     annotationsRef.current = annotations ?? [];
     const container = containerRef.current;
     if (!container || !viewerRef.current) return;
 
-    alignTextLayers(container);
     drawOverlayHighlights(container, annotationsRef.current);
+    snapshot("annotations effect");
   }, [annotations]);
 
   useEffect(() => {
+    if (isDebugEnabled()) {
+      debugLog("[PdfViewer] viewer effect run", { src });
+    }
+
     let cancelled = false;
 
     const teardown = () => {
+      if (isDebugEnabled()) {
+        debugLog("[PdfViewer] teardown", {
+          hasViewer: !!viewerRef.current,
+        });
+      }
       try {
         cleanupRef.current();
       } catch {
         // ignore teardown errors
       }
       cleanupRef.current = () => {};
-      resizeObserverRef.current?.disconnect();
-      resizeObserverRef.current = null;
       viewerRef.current = null;
     };
 
     const setup = async () => {
+      if (isDebugEnabled()) {
+        debugLog("[PdfViewer] setup start", { src });
+      }
       const container = containerRef.current;
       if (!container) return;
 
       teardown();
       container.innerHTML = "";
-      container.style.position = container.style.position || "relative";
+      container.style.position = "absolute";
+      (container.style as any).inset = "0";
       container.style.overflow = "auto";
+      if (isDebugEnabled()) {
+        debugLog("[PdfViewer] container initialized", {
+          clientWidth: container.clientWidth,
+          clientHeight: container.clientHeight,
+          scrollWidth: container.scrollWidth,
+          scrollHeight: container.scrollHeight,
+        });
+      }
 
       const viewerHost = document.createElement("div");
       viewerHost.className = "pdfViewer";
       container.appendChild(viewerHost);
+      if (isDebugEnabled()) {
+        debugLog("[PdfViewer] viewer host appended", {
+          childCount: container.children.length,
+        });
+      }
 
       try {
         const { pdfjsLib, pdfjsViewer } = await loadPdfJs();
         if (cancelled) return;
+        if (isDebugEnabled()) {
+          debugLog("[PdfViewer] pdf.js modules loaded", {
+            version: pdfjsLib?.version,
+          });
+        }
 
         const cleanupFns: Array<() => void> = [];
         const eventBus = new pdfjsViewer.EventBus();
         const linkService = new pdfjsViewer.PDFLinkService({ eventBus });
         const viewer = new pdfjsViewer.PDFViewer({
           container,
+          viewer: viewerHost,
           eventBus,
           linkService,
           textLayerMode: 1,
         });
         linkService.setViewer(viewer);
         viewerRef.current = viewer;
+        if (isDebugEnabled()) {
+          debugLog("[PdfViewer] PDFViewer instantiated", {
+            pagesCount: viewer.pagesCount,
+            currentScale: viewer.currentScale,
+            currentScaleValue: viewer.currentScaleValue,
+          });
+        }
+        snapshot("after viewer init");
 
         const loadingTask = pdfjsLib.getDocument({ url: src, withCredentials: false });
         const pdf = await loadingTask.promise;
@@ -362,18 +474,55 @@ export default function PdfViewer({
           }
           return;
         }
+        if (isDebugEnabled()) {
+          debugLog("[PdfViewer] document loaded", {
+            numPages: pdf?.numPages,
+            fingerprint: pdf?.fingerprint,
+          });
+        }
 
         linkService.setDocument(pdf, null);
         viewer.setDocument(pdf);
+        snapshot("after setDocument", { numPages: pdf?.numPages });
 
-        const handlePagesInit = () => {
+        const ensurePageWidth = async () => {
+          if (!viewerRef.current) return;
+          if (isDebugEnabled()) {
+            debugLog("[PdfViewer] ensurePageWidth:start", {
+              currentScale: viewerRef.current.currentScale,
+              currentScaleValue: viewerRef.current.currentScaleValue,
+            });
+          }
           try {
-            viewer.currentScaleValue = "page-width";
+            await (document as any).fonts?.ready;
+          } catch {
+            /* ignore font readiness */
+          }
+          if (!viewerRef.current) return;
+          try {
+            viewerRef.current.currentScaleValue = "page-width";
           } catch {
             /* ignore */
           }
-          alignTextLayers(container);
-          drawOverlayHighlights(container, annotationsRef.current);
+          try {
+            viewerRef.current.update?.();
+          } catch {
+            /* ignore */
+          }
+          snapshot("ensurePageWidth:after");
+        };
+
+        const handlePagesInit = (evt: any) => {
+          if (isDebugEnabled()) {
+            debugLog("[PdfViewer] pagesinit", {
+              event: evt,
+              currentScale: viewerRef.current?.currentScale,
+            });
+          }
+          ensurePageWidth().finally(() => {
+            drawOverlayHighlights(container, annotationsRef.current);
+            snapshot("pagesinit:after", evt);
+          });
         };
         eventBus.on("pagesinit", handlePagesInit);
         cleanupFns.push(() => {
@@ -384,43 +533,90 @@ export default function PdfViewer({
           }
         });
 
-        const handleTextLayerRendered = () => {
-          alignTextLayers(container);
+        const handleTextLayerRendered = (evt: any) => {
+          if (isDebugEnabled()) {
+            debugLog("[PdfViewer] textlayerrendered", evt);
+          }
           drawOverlayHighlights(container, annotationsRef.current);
+          snapshot("textlayerrendered", evt);
         };
-        eventBus.on("textlayerrendered", handleTextLayerRendered as any);
+        eventBus.on("textlayerrendered", handleTextLayerRendered);
         cleanupFns.push(() => {
           try {
-            eventBus.off("textlayerrendered", handleTextLayerRendered as any);
+            eventBus.off("textlayerrendered", handleTextLayerRendered);
           } catch {
             /* noop */
           }
         });
 
-        try {
-          const ro = new ResizeObserver(() => {
-            if (!viewerRef.current) return;
-            try {
-              viewerRef.current.currentScaleValue = "page-width";
-            } catch {
-              /* noop */
-            }
-            alignTextLayers(container);
-            drawOverlayHighlights(container, annotationsRef.current);
-          });
-          ro.observe(container);
-          resizeObserverRef.current = ro;
-          cleanupFns.push(() => {
-            try {
-              ro.disconnect();
-            } catch {
-              /* noop */
-            }
-            resizeObserverRef.current = null;
-          });
-        } catch {
-          /* ResizeObserver may be unavailable */
-        }
+        const handlePageRendered = (evt: any) => {
+          if (isDebugEnabled()) {
+            debugLog("[PdfViewer] pagerendered", evt);
+          }
+          snapshot("pagerendered", evt);
+        };
+        eventBus.on("pagerendered", handlePageRendered);
+        cleanupFns.push(() => {
+          try {
+            eventBus.off("pagerendered", handlePageRendered);
+          } catch {
+            /* noop */
+          }
+        });
+
+        const handleScaleChanging = (evt: any) => {
+          if (isDebugEnabled()) {
+            debugLog("[PdfViewer] scalechanging", {
+              event: evt,
+              currentScale: viewerRef.current?.currentScale,
+            });
+          }
+          snapshot("scalechanging", evt);
+        };
+        eventBus.on("scalechanging", handleScaleChanging);
+        cleanupFns.push(() => {
+          try {
+            eventBus.off("scalechanging", handleScaleChanging);
+          } catch {
+            /* noop */
+          }
+        });
+
+        const handleScaleChange = (evt: any) => {
+          if (isDebugEnabled()) {
+            debugLog("[PdfViewer] scalechange", {
+              event: evt,
+              currentScale: viewerRef.current?.currentScale,
+            });
+          }
+          snapshot("scalechange", evt);
+        };
+        eventBus.on("scalechange", handleScaleChange);
+        cleanupFns.push(() => {
+          try {
+            eventBus.off("scalechange", handleScaleChange);
+          } catch {
+            /* noop */
+          }
+        });
+
+        const handlePagesLoaded = (evt: any) => {
+          if (isDebugEnabled()) {
+            debugLog("[PdfViewer] pagesloaded", evt);
+          }
+          snapshot("pagesloaded", evt);
+        };
+        eventBus.on("pagesloaded", handlePagesLoaded);
+        cleanupFns.push(() => {
+          try {
+            eventBus.off("pagesloaded", handlePagesLoaded);
+          } catch {
+            /* noop */
+          }
+        });
+
+        ensurePageWidth();
+        snapshot("post ensurePageWidth call");
 
         cleanupFns.push(() => {
           try {
@@ -452,6 +648,11 @@ export default function PdfViewer({
         });
 
         cleanupRef.current = () => {
+          if (isDebugEnabled()) {
+            debugLog("[PdfViewer] cleanup run", {
+              remaining: cleanupFns.length,
+            });
+          }
           cleanupFns.splice(0, cleanupFns.length).forEach((fn) => {
             try {
               fn();
@@ -473,18 +674,24 @@ export default function PdfViewer({
 
     return () => {
       cancelled = true;
+      if (isDebugEnabled()) {
+        debugLog("[PdfViewer] effect cleanup", { src });
+      }
       teardown();
     };
   }, [src]);
 
   return (
-    <div className={className} style={{ width: "100%", height: "100%" }}>
+    <div
+      className={className}
+      style={{ width: "100%", height: "100%", position: "absolute" }}
+    >
       {error ? (
         <div className="text-red-500 text-sm p-4">{error}</div>
       ) : (
         <div
           ref={containerRef}
-          style={{ width: "100%", height: "100%", overflow: "auto", position: "absolute" }}
+          style={{ position: "absolute", inset: 0, overflow: "auto" }}
         />
       )}
     </div>
