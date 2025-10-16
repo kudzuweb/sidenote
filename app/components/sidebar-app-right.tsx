@@ -45,6 +45,7 @@ type SidebarAppProps = { data; user: UserInfo; side: "left" | "right"; selection
 
 export function SidebarApp({ side, data, user, selectionRef, includeSelection, setIncludeSelection, ...props }: SidebarAppProps) {
   const [mode, setMode] = useState("annotation")
+  const [tabsValue, setTabsValue] = useState<"tab-1" | "tab-2">("tab-1")
   const { setOpen } = useSidebar()
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null)
   const [chats, setChats] = useState<ChatListItem[]>(data.chats as ChatListItem[])
@@ -83,11 +84,13 @@ export function SidebarApp({ side, data, user, selectionRef, includeSelection, s
   useEffect(() => {
     if (params.chatId) {
       const id = params.chatId as string
+      setMode("chat")
+      setTabsValue("tab-2")
       setSelectedChatId(id)
       setChats((prev) => (prev.some((c) => c.id === id) ? prev : [{ id, messages: [] }, ...prev]))
       setOpen(true)
     }
-  }, [params.chatId])
+  }, [params.chatId, setOpen])
 
   useEffect(() => {
     if (selectedChatId) {
@@ -135,7 +138,7 @@ export function SidebarApp({ side, data, user, selectionRef, includeSelection, s
   return (
     <Sidebar className="border-r-0" {...props} side="right">
       <SidebarHeader>
-        <Tabs defaultValue="tab-1" className="items-center">
+        <Tabs value={tabsValue} onValueChange={(value) => setTabsValue(value as "tab-1" | "tab-2")} className="items-center">
           <div className="flex w-full items-center justify-between">
             <Button size="icon" variant="ghost" onClick={() => setSelectedChatId(null)}>
               <ArrowLeft className="h-5 w-5" />
@@ -147,6 +150,7 @@ export function SidebarApp({ side, data, user, selectionRef, includeSelection, s
                   <TooltipTrigger asChild>
                     <span>
                       <TabsTrigger value="tab-1" className="py-3" onClick={() => {
+                        setTabsValue("tab-1")
                         setMode("annotation")
                         setSelectedChatId(null)
                         setSelectedAnnotationId(null)
@@ -165,6 +169,7 @@ export function SidebarApp({ side, data, user, selectionRef, includeSelection, s
                   <TooltipTrigger asChild>
                     <span>
                       <TabsTrigger value="tab-2" className="group py-3" onClick={() => {
+                        setTabsValue("tab-2")
                         setMode("chat")
                         setSelectedChatId(null)
                         setSelectedAnnotationId(null)

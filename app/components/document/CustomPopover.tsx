@@ -36,6 +36,7 @@ export function CustomPopover({
 }: PopoverProps) {
     const rootRef = useRef<HTMLDivElement>(null);
     const hiddenRef = useRef<HTMLInputElement>(null);
+    const newChatHiddenRef = useRef<HTMLInputElement>(null);
     const noteRef = useRef<HTMLTextAreaElement>(null);
 
     useEffect(() => {
@@ -78,6 +79,22 @@ export function CustomPopover({
     };
 
     const [tweetSidenote, setTweetSidenote] = useState("");
+
+    const handleCreateChatSubmit: React.FormEventHandler<HTMLFormElement> = () => {
+        const selectionValue = selectionRef.current && selectionRef.current.trim().length > 0
+            ? selectionRef.current
+            : selectionText;
+
+        if (newChatHiddenRef.current) {
+            newChatHiddenRef.current.value = selectionValue ?? "";
+        }
+
+        if (selectionValue && selectionValue.length > 0) {
+            setIncludeSelection(true);
+        }
+
+        onRequestClose();
+    };
 
     return (
         <div
@@ -139,10 +156,11 @@ export function CustomPopover({
                     </TooltipProvider>
                 </Form>
                 <div className="flex flex-row">
-                    <Form method="post" action={`/workspace/document/${docId}/chat-create`}>
+                    <Form method="post" action={`/workspace/document/${docId}/chat-create`} onSubmit={handleCreateChatSubmit}>
+                        <input ref={newChatHiddenRef} type="hidden" name="selection" />
                         <Tooltip>
                             <TooltipTrigger asChild>
-                                <Button size="icon" variant="ghost" onClick={() => { }}>
+                                <Button size="icon" variant="ghost" type="submit">
                                     <MessageCirclePlus className="h-2 w-2" />
                                     <span className="sr-only">Create new chat</span>
                                 </Button>
