@@ -40,7 +40,7 @@ export const loader = async ({ request, params }: Route.LoaderArgs) => {
 
   const waitForDocument = async () => {
     if (params?.id) {
-      const document = await getDocument(userId, params.id);
+      const document = await getDocument(params.id, userId);
       return document;
     }
   };

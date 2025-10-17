@@ -12,14 +12,19 @@ export async function action({ request }: ActionFunctionArgs) {
 
 
   const userId = await requireUser(request)
-  try {
-    await ensureDocumentAllowance(userId)
-  } catch (error) {
-    if ((error as any)?.code === "DOCUMENT_LIMIT_REACHED") {
-      throw redirect("/workspace?billing=limit")
+
+  const assertAllowance = async () => {
+    try {
+      await ensureDocumentAllowance(userId)
+    } catch (error) {
+      if ((error as any)?.code === "DOCUMENT_LIMIT_REACHED") {
+        throw redirect("/workspace?billing=limit")
+      }
+      throw error
     }
-    throw error
   }
+
+  await assertAllowance()
   const formData = await request.formData()
   const url = String(formData.get("url") || "").trim()
   const crawl = String(formData.get("crawl") || "").trim() === "on"
@@ -48,6 +53,7 @@ export async function action({ request }: ActionFunctionArgs) {
       const createdIds: string[] = []
       for (const page of pages) {
         if (!page.textContent) continue
+        await assertAllowance()
         if (page.url) {
           const existingPageDocument = await findDocumentByUrl(page.url)
           if (existingPageDocument) {
@@ -80,7 +86,7 @@ export async function action({ request }: ActionFunctionArgs) {
           userId,
           createdAt: new Date(),
           updatedAt: new Date(),
-        })
+        }, userId)
         await attachAuthorsToDocument(documentId, [
           ...resolvedMetadata.authors,
           page.byline,
@@ -133,7 +139,7 @@ export async function action({ request }: ActionFunctionArgs) {
         userId,
         createdAt: new Date(),
         updatedAt: new Date(),
-      })
+      }, userId)
       await attachAuthorsToDocument(documentId, [
         ...(resolvedMetadata?.authors ?? []),
         primaryPage?.byline,
@@ -198,7 +204,7 @@ export async function action({ request }: ActionFunctionArgs) {
     createdAt: new Date(),
     updatedAt: new Date(),
   }
-  await saveDocument(document)
+  await saveDocument(document, userId)
 
   // if (article.byline) {
   //   // split by ',' 'and' '&'

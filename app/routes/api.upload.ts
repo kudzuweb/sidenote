@@ -181,7 +181,7 @@ export async function action({ request }: ActionFunctionArgs) {
             createdAt: now,
             updatedAt: now,
         };
-        await saveDocument(document);
+        await saveDocument(document, userId);
         await attachAuthorsToDocument(documentId, [
           ...resolvedMetadata.authors,
           ...pdfCollectedMeta.authors,
@@ -247,7 +247,7 @@ export async function action({ request }: ActionFunctionArgs) {
             createdAt: now,
             updatedAt: now,
         }
-        await saveDocument(document)
+        await saveDocument(document, userId)
         await attachAuthorsToDocument(documentId, [
           ...resolvedMetadata.authors,
           ...epubMeta.authors,
