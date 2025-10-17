@@ -9,28 +9,18 @@ export const getAllDocuments = async (): Promise<DocumentRow[]> => {
   return results
 }
 
-export const getDocuments = async (userId?: string) => {
+export const getDocuments = async (userId?: string): Promise<DocumentRow[]> => {
   if (!userId) {
-    return db.select().from(documentTable)
+    return await db.select().from(documentTable)
   }
 
   const results = await db
-    .select({
-      id: documentTable.id,
-      url: documentTable.url,
-      title: documentTable.title,
-      content: documentTable.content,
-      textContent: documentTable.textContent,
-      publishedTime: documentTable.publishedTime,
-      createdAt: documentTable.createdAt,
-      updatedAt: documentTable.updatedAt,
-      role: userDocumentTable.role,
-    })
+    .select({ document: documentTable })
     .from(userDocumentTable)
     .innerJoin(documentTable, eq(userDocumentTable.documentId, documentTable.id))
     .where(eq(userDocumentTable.userId, userId))
 
-  return results
+  return results.map(result => result.document)
 }
 
 export const getDocument = async (id: string, userId?: string) => {
@@ -63,20 +53,29 @@ export const findDocumentByUrl = async (url: string): Promise<DocumentRow | null
 export const ensureUserDocumentLink = async (
   userId: string,
   documentId: string,
-  timestamps?: { createdAt?: Date; updatedAt?: Date }
+  role: DocumentRole = "viewer"
 ) => {
   if (!userId || !documentId) return
-  const createdAt = timestamps?.createdAt ?? new Date()
-  const updatedAt = timestamps?.updatedAt ?? new Date()
-  await db
-    .insert(userDocumentTable)
-    .values({
-      userId,
-      documentId,
-      createdAt,
-      updatedAt,
-    })
-    .onConflictDoNothing({ target: [userDocumentTable.userId, userDocumentTable.documentId] })
+
+  const existing = await db
+    .select({ role: userDocumentTable.role })
+    .from(userDocumentTable)
+    .where(
+      and(
+        eq(userDocumentTable.userId, userId),
+        eq(userDocumentTable.documentId, documentId)
+      )
+    )
+    .limit(1)
+
+  if (existing.length > 0) {
+    if (role === "owner" && existing[0].role !== "owner") {
+      await linkUserToDocument(userId, documentId, role)
+    }
+    return
+  }
+
+  await linkUserToDocument(userId, documentId, role)
 }
 
 export const linkUserToDocument = async (
@@ -132,7 +131,11 @@ export const linkUserToDocument = async (
   return { success: true }
 }
 
-export const saveDocument = async (document: DocumentCreate) => {
+export const saveDocument = async (
+  document: DocumentCreate,
+  ownerUserId?: string,
+  role: DocumentRole = "owner"
+) => {
   const createdAt = document.createdAt ?? new Date()
   const updatedAt = document.updatedAt ?? new Date()
   const dbDocument = documentObjectToRow({ ...document, createdAt, updatedAt })
@@ -141,20 +144,9 @@ export const saveDocument = async (document: DocumentCreate) => {
     .values(dbDocument)
     .onConflictDoUpdate({ target: documentTable.id, set: dbDocument })
 
-    if (ownerUserId) {
-      await linkUserToDocument(ownerUserId, document.id, role)
-    }
-  
-  if (document.userId) {
-    await db
-      .insert(userDocumentTable)
-      .values({
-        userId: document.userId,
-        documentId: document.id,
-        createdAt: document.createdAt ?? new Date(),
-        updatedAt: document.updatedAt ?? new Date(),
-      })
-      .onConflictDoNothing({ target: [userDocumentTable.userId, userDocumentTable.documentId] })
+  const linkingUserId = ownerUserId ?? document.userId
+  if (linkingUserId) {
+    await linkUserToDocument(linkingUserId, document.id, role)
   }
 
   return { success: true }
@@ -181,7 +173,7 @@ export const getUserDocumentCount = async (userId: string) => {
     .where(
       and(
         eq(userDocumentTable.userId, userId),
-        eq(userDocumentTable.role, "owner" as any)
+        eq(userDocumentTable.role, "owner")
       )
     )
 
@@ -196,7 +188,7 @@ export const userHasDocument = async (userId: string, documentId: string) => {
       and(
         eq(userDocumentTable.userId, userId),
         eq(userDocumentTable.documentId, documentId),
-        eq(userDocumentTable.role, "owner" as any)
+        eq(userDocumentTable.role, "owner")
       )
     )
 
