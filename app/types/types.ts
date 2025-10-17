@@ -15,6 +15,7 @@ export type Visibility = "private" | "public"
 export type PermissionLevel = "none" | "read" | "write" | "admin"
 export type ResourceType = "document" | "annotation" | "comment" | "chat" | "group"
 export type PrincipalType = "group" | "user"
+export type DocumentRole = "owner" | "viewer"
 
 //This uses Supabase's special DB magic to tell us what the types are for the rows that each table returns
 // mouseover the type name to see what it is!

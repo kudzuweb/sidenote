@@ -3,6 +3,7 @@ import { boolean, integer, pgEnum, pgTable, primaryKey, text, timestamp, vector 
 export const visibilityEnum = pgEnum("visibility", ["private", "public"]);
 export const resourceEnum = pgEnum("resource", ["document", "annotation", "comment", "chat", "group"]);
 export const principalEnum = pgEnum("principal", ["user", "group"]);
+export const documentRoleEnum = pgEnum("document_role", ["owner", "viewer"]);
 export const permissionLevelEnum = pgEnum("permission_level", ["read", "write", "admin"]);
 export const planEnum = pgEnum("plan", ["free", "pro"]);
 export const subscriptionStatusEnum = pgEnum("subscription_status", ["inactive", "trialing", "active", "past_due", "canceled"]);
@@ -232,6 +233,7 @@ export const userDocumentTable = pgTable("user_document", {
   documentId: text("document_id")
     .notNull()
     .references(() => documentTable.id, { onDelete: "cascade" }),
+  role: documentRoleEnum("role").notNull().default("owner"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at")
     .defaultNow()

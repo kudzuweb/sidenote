@@ -33,7 +33,7 @@ export async function loader({
   if (!params.id) {
     throw redirect("/");
   }
-  const document = await getDocument(params.id);
+  const document = await getDocument(params.id, userId);
   const annotations = await getAnnotations(userId, params.id);
   const color = await getColorFromID(userId);
   if (!document) {
