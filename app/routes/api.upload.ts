@@ -11,9 +11,81 @@ import { supabaseAdmin } from "~/server/supabase.server";
 import { chunkText, generateEmbeddings } from "~/server/document.server";
 import { extractPdfText, PdfExtractionError } from "~/server/pdf-extractor.server";
 import { ensureDocumentAllowance } from "~/server/billing.server";
+import { resolveDocumentMetadata, parseAuthorNames } from "~/server/document-metadata.server";
+import type { CollectedMetadata } from "~/server/document-metadata.server";
+import { attachAuthorsToDocument } from "~/server/authors.server";
 
 
 const MAX_UPLOAD_BYTES = 15 * 1024 * 1024; // 15 MB
+
+const flattenMetadataValue = (value: unknown): string[] => {
+  if (!value) return [];
+  if (typeof value === "string") return [value];
+  if (Array.isArray(value)) {
+    return value.flatMap(entry => flattenMetadataValue(entry));
+  }
+  if (typeof value === "object") {
+    const obj = value as Record<string, unknown>;
+    const candidates: string[] = [];
+    if (typeof obj.name === "string") candidates.push(obj.name);
+    if (typeof obj.value === "string") candidates.push(obj.value);
+    if (typeof obj.text === "string") candidates.push(obj.text);
+    if (typeof obj.title === "string") candidates.push(obj.title);
+    return candidates.length > 0 ? candidates : [];
+  }
+  return [];
+};
+
+const collectRecordMetadata = (
+  record: Record<string, unknown> | null | undefined,
+  authorKeys: string[],
+  dateKeys: string[]
+): CollectedMetadata => {
+  const authorsSet = new Set<string>();
+  const publishedSet = new Set<string>();
+  const raw: Record<string, string> = {};
+
+  if (!record) {
+    return { authors: [], publishedTimes: [], raw };
+  }
+
+  const entries = Object.entries(record);
+  const lookup = new Map<string, unknown>();
+  for (const [key, value] of entries) {
+    lookup.set(key.toLowerCase(), value);
+  }
+
+  for (const key of authorKeys) {
+    const values = flattenMetadataValue(lookup.get(key.toLowerCase()));
+    for (const value of values) {
+      parseAuthorNames(value).forEach(name => {
+        if (!name) return;
+        authorsSet.add(name);
+      });
+    }
+  }
+
+  for (const key of dateKeys) {
+    const values = flattenMetadataValue(lookup.get(key.toLowerCase()));
+    for (const value of values) {
+      const normalized = String(value).trim();
+      if (!normalized) continue;
+      publishedSet.add(normalized);
+    }
+  }
+
+  for (const [key, value] of entries) {
+    const texts = flattenMetadataValue(value);
+    if (texts.length === 0) continue;
+    raw[`meta_${key}`] = texts.join(", ");
+  }
+
+  return {
+    authors: Array.from(authorsSet),
+    publishedTimes: Array.from(publishedSet),
+    raw,
+  };
+};
 
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -39,9 +111,15 @@ export async function action({ request }: ActionFunctionArgs) {
 
     if (isPdf) {
         let pdfText: string;
+        let pdfCollectedMeta: CollectedMetadata = { authors: [], publishedTimes: [], raw: {} };
         try {
           const parsed = await extractPdfText(buffer);
           pdfText = parsed.text;
+          pdfCollectedMeta = collectRecordMetadata(
+            parsed.metadata as Record<string, unknown> | null,
+            ["Author", "author", "Creator", "creator", "dc:creator", "dc:contributors", "meta:author"],
+            ["CreationDate", "ModDate", "Date", "xap:CreateDate", "xmp:CreateDate", "dcterms:created", "meta:creation-date"]
+          );
         } catch (error) {
           if (error instanceof PdfExtractionError) {
             console.warn("[api.upload] pdf text extraction failed", { message: error.message });
@@ -82,18 +160,32 @@ export async function action({ request }: ActionFunctionArgs) {
         const { data: publicUrlData } = supabaseAdmin.storage.from(bucket).getPublicUrl(filename);
         const publicUrl = publicUrlData?.publicUrl ?? `/${bucket}/${filename}`;
 
+        const resolvedMetadata = await resolveDocumentMetadata({
+          url: publicUrl,
+          title: (file.name || "Untitled PDF").replace(/\.[^/.]+$/, ""),
+          byline: null,
+          textContent: pdfText,
+          publishedTime: null,
+          meta: pdfCollectedMeta,
+        });
+
         const now = new Date();
         const document: DocumentCreate = {
             id: documentId,
             url: publicUrl,
-            title: (file.name || "Untitled PDF").replace(/\.[^/.]+$/, ""),
+            title: resolvedMetadata.title ?? (file.name || "Untitled PDF").replace(/\.[^/.]+$/, ""),
             content: "",
             textContent: pdfText,
-            publishedTime: null,
+            publishedTime: resolvedMetadata.publishedAt ?? null,
+            userId,
             createdAt: now,
             updatedAt: now,
         };
         await saveDocument(document, userId);
+        await attachAuthorsToDocument(documentId, [
+          ...resolvedMetadata.authors,
+          ...pdfCollectedMeta.authors,
+        ]);
 
         const documentChunks = chunkedDocs.map((doc, index) => ({
           id: crypto.randomUUID(),
@@ -120,20 +212,46 @@ export async function action({ request }: ActionFunctionArgs) {
             book.flow.map((ch: any) => book.getChapterRawAsync(ch.id))
         )
         const html = htmlChapters.join('\n')
+        const epubMeta = collectRecordMetadata(
+          book.metadata as Record<string, unknown> | null,
+          ["creator", "creatorfileas", "contributor", "author"],
+          ["date", "modified", "pubdate", "published"]
+        )
+        const plainText = html
+          .replace(/<style[\s\S]*?<\/style>/gi, " ")
+          .replace(/<script[\s\S]*?<\/script>/gi, " ")
+          .replace(/<[^>]+>/g, " ")
+          .replace(/\s+/g, " ")
+          .trim()
+          .slice(0, 2000)
+
+        const resolvedMetadata = await resolveDocumentMetadata({
+          url: "epub",
+          title: book.metadata?.title ?? (file.name || "Untitled EPUB"),
+          byline: null,
+          textContent: plainText,
+          publishedTime: epubMeta.publishedTimes[0] ?? null,
+          meta: epubMeta,
+        })
 
         const documentId = crypto.randomUUID()
         const now = new Date();
         const document: DocumentCreate = {
             id: documentId,
             url: "epub",
-            title: book.metadata.title,
+            title: resolvedMetadata.title ?? book.metadata?.title ?? (file.name || "Untitled EPUB"),
             content: html,
             textContent: null,
-            publishedTime: null,
+            publishedTime: resolvedMetadata.publishedAt ?? epubMeta.publishedTimes[0] ?? null,
+            userId,
             createdAt: now,
             updatedAt: now,
         }
         await saveDocument(document, userId)
+        await attachAuthorsToDocument(documentId, [
+          ...resolvedMetadata.authors,
+          ...epubMeta.authors,
+        ])
         return redirect(`/workspace/document/${documentId}`)
     } finally {
         await unlink(tmpPath).catch(() => { });

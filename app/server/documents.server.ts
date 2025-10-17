@@ -9,28 +9,18 @@ export const getAllDocuments = async (): Promise<DocumentRow[]> => {
   return results
 }
 
-export const getDocuments = async (userId?: string) => {
+export const getDocuments = async (userId?: string): Promise<DocumentRow[]> => {
   if (!userId) {
-    return db.select().from(documentTable)
+    return await db.select().from(documentTable)
   }
 
   const results = await db
-    .select({
-      id: documentTable.id,
-      url: documentTable.url,
-      title: documentTable.title,
-      content: documentTable.content,
-      textContent: documentTable.textContent,
-      publishedTime: documentTable.publishedTime,
-      createdAt: documentTable.createdAt,
-      updatedAt: documentTable.updatedAt,
-      role: userDocumentTable.role,
-    })
+    .select({ document: documentTable })
     .from(userDocumentTable)
     .innerJoin(documentTable, eq(userDocumentTable.documentId, documentTable.id))
     .where(eq(userDocumentTable.userId, userId))
 
-  return results
+  return results.map(result => result.document)
 }
 
 export const getDocument = async (id: string, userId?: string) => {
@@ -48,6 +38,44 @@ export const getDocument = async (id: string, userId?: string) => {
   // const results = { ...document[0], annotations: annotationsWithComments }
   // return results
   return document[0]
+}
+
+export const findDocumentByUrl = async (url: string): Promise<DocumentRow | null> => {
+  if (!url) return null
+  const results = await db
+    .select()
+    .from(documentTable)
+    .where(eq(documentTable.url, url))
+    .limit(1)
+  return results[0] ?? null
+}
+
+export const ensureUserDocumentLink = async (
+  userId: string,
+  documentId: string,
+  role: DocumentRole = "viewer"
+) => {
+  if (!userId || !documentId) return
+
+  const existing = await db
+    .select({ role: userDocumentTable.role })
+    .from(userDocumentTable)
+    .where(
+      and(
+        eq(userDocumentTable.userId, userId),
+        eq(userDocumentTable.documentId, documentId)
+      )
+    )
+    .limit(1)
+
+  if (existing.length > 0) {
+    if (role === "owner" && existing[0].role !== "owner") {
+      await linkUserToDocument(userId, documentId, role)
+    }
+    return
+  }
+
+  await linkUserToDocument(userId, documentId, role)
 }
 
 export const linkUserToDocument = async (
@@ -107,15 +135,18 @@ export const saveDocument = async (
   document: DocumentCreate,
   ownerUserId?: string,
   role: DocumentRole = "owner"
-): Promise<{ success: true }> => {
-  const dbDocument = documentObjectToRow(document)
+) => {
+  const createdAt = document.createdAt ?? new Date()
+  const updatedAt = document.updatedAt ?? new Date()
+  const dbDocument = documentObjectToRow({ ...document, createdAt, updatedAt })
   await db
     .insert(documentTable)
     .values(dbDocument)
     .onConflictDoUpdate({ target: documentTable.id, set: dbDocument })
 
-  if (ownerUserId) {
-    await linkUserToDocument(ownerUserId, document.id, role)
+  const linkingUserId = ownerUserId ?? document.userId
+  if (linkingUserId) {
+    await linkUserToDocument(linkingUserId, document.id, role)
   }
 
   return { success: true }
@@ -142,7 +173,7 @@ export const getUserDocumentCount = async (userId: string) => {
     .where(
       and(
         eq(userDocumentTable.userId, userId),
-        eq(userDocumentTable.role, "owner" as any)
+        eq(userDocumentTable.role, "owner")
       )
     )
 
@@ -157,7 +188,7 @@ export const userHasDocument = async (userId: string, documentId: string) => {
       and(
         eq(userDocumentTable.userId, userId),
         eq(userDocumentTable.documentId, documentId),
-        eq(userDocumentTable.role, "owner" as any)
+        eq(userDocumentTable.role, "owner")
       )
     )
 
@@ -185,7 +216,6 @@ const documentObjectToRow = (doc: DocumentCreate) => {
     content: doc.content,
     textContent: doc.textContent,
     publishedTime: doc.publishedTime,
-    visibility: doc.visibility,
     createdAt: doc.createdAt ?? new Date(),
     updatedAt: doc.updatedAt ?? new Date()
   }

@@ -1,5 +1,6 @@
-import { Readability } from "@mozilla/readability"
 import { JSDOM } from "jsdom"
+import { Readability } from "@mozilla/readability"
+import { collectDocumentMetadata } from "./document-metadata.server"
 
 export type ExtractedContent = {
   url: string
@@ -8,12 +9,14 @@ export type ExtractedContent = {
   textContent: string
   byline: string | null
   publishedTime: string | null
+  meta: ReturnType<typeof collectDocumentMetadata>
 }
 
 export async function extractMainFromHtml(html: string, url: string): Promise<ExtractedContent | null> {
   try {
     const dom = new JSDOM(html, { url })
     const doc = dom.window.document
+    const meta = collectDocumentMetadata(doc)
     const reader = new Readability(doc)
     const article = reader.parse()
     if (!article || !article.textContent) {
@@ -28,6 +31,7 @@ export async function extractMainFromHtml(html: string, url: string): Promise<Ex
       textContent: article.textContent,
       byline: article.byline ?? null,
       publishedTime: article.publishedTime ?? null,
+      meta,
     }
   } catch (err) {
     console.error("[extractor] error parsing html", { url, err })
@@ -56,4 +60,3 @@ export async function extractMainFromUrl(url: string): Promise<ExtractedContent 
     return null
   }
 }
-

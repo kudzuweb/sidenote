@@ -1,5 +1,6 @@
-import { extractMainFromHtml } from "~/server/content-extractor.server"
 import { JSDOM } from "jsdom"
+import { extractMainFromHtml } from "~/server/content-extractor.server"
+import type { CollectedMetadata } from "~/server/document-metadata.server"
 
 type CrawlOptions = {
   maxPages?: number
@@ -14,6 +15,8 @@ type CrawledPage = {
   content: string | null
   textContent: string
   publishedTime: string | null
+  byline: string | null
+  meta: CollectedMetadata
 }
 
 const defaultExclude = [".pdf", ".doc", ".docx", ".ppt", ".pptx", ".zip", ".png", ".jpg", ".jpeg", ".gif", ".svg"]
@@ -70,6 +73,8 @@ export async function crawlSite(startUrl: string, options: CrawlOptions = {}): P
           content: extracted.content,
           textContent: extracted.textContent,
           publishedTime: extracted.publishedTime,
+          byline: extracted.byline,
+          meta: extracted.meta,
         })
         console.log("[crawler] extracted", { url: extracted.url, title: extracted.title?.slice(0, 60) })
       } else {
