@@ -1,7 +1,8 @@
-import { documentChunksTable, documentTable, userDocumentTable } from "~/db/schema"
+import { documentChunksTable, documentTable, permissionTable, userDocumentTable } from "~/db/schema"
 import { db } from "~/server/index.server"
 import { and, eq, count } from "drizzle-orm"
-import type { Document, DocumentCreate, DocumentChunk, DocumentRow } from "~/types/types"
+import { requirePermission } from "./permissions.server.helper"
+import type { Document, DocumentCreate, DocumentChunk, DocumentRow, DocumentRole } from "~/types/types"
 
 export const getAllDocuments = async (): Promise<DocumentRow[]> => {
   const results = await db.select().from(documentTable)
@@ -23,6 +24,7 @@ export const getDocuments = async (userId?: string) => {
       publishedTime: documentTable.publishedTime,
       createdAt: documentTable.createdAt,
       updatedAt: documentTable.updatedAt,
+      role: userDocumentTable.role,
     })
     .from(userDocumentTable)
     .innerJoin(documentTable, eq(userDocumentTable.documentId, documentTable.id))
@@ -31,7 +33,11 @@ export const getDocuments = async (userId?: string) => {
   return results
 }
 
-export const getDocument = async (id: string) => {
+export const getDocument = async (id: string, userId?: string) => {
+  if (userId) {
+    await requirePermission(userId, "document", id, "read")
+  }
+
   const document = await db.select().from(documentTable).where(eq(documentTable.id, id))
   if (!document) return null
   // const annotations = await db.select().from(annotation).where(eq(annotation.docId, id))
@@ -44,23 +50,72 @@ export const getDocument = async (id: string) => {
   return document[0]
 }
 
-export const saveDocument = async (document: DocumentCreate) => {
+export const linkUserToDocument = async (
+  userId: string,
+  documentId: string,
+  role: DocumentRole = "viewer"
+): Promise<{ success: true }> => {
+  const now = new Date()
+
+  await db
+    .insert(userDocumentTable)
+    .values({
+      userId,
+      documentId,
+      role,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .onConflictDoUpdate({
+      target: [userDocumentTable.userId, userDocumentTable.documentId],
+      set: {
+        role,
+        updatedAt: now,
+      },
+    })
+
+  const permissionLevel = role === "owner" ? "admin" : "read"
+
+  await db
+    .insert(permissionTable)
+    .values({
+      resourceType: "document" as any,
+      resourceId: documentId,
+      principalType: "user" as any,
+      principalId: userId,
+      permissionLevel: permissionLevel as any,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .onConflictDoUpdate({
+      target: [
+        permissionTable.resourceType,
+        permissionTable.resourceId,
+        permissionTable.principalType,
+        permissionTable.principalId,
+      ],
+      set: {
+        permissionLevel: permissionLevel as any,
+        updatedAt: now,
+      },
+    })
+
+  return { success: true }
+}
+
+export const saveDocument = async (
+  document: DocumentCreate,
+  ownerUserId?: string,
+  role: DocumentRole = "owner"
+): Promise<{ success: true }> => {
   const dbDocument = documentObjectToRow(document)
   await db
     .insert(documentTable)
     .values(dbDocument)
     .onConflictDoUpdate({ target: documentTable.id, set: dbDocument })
 
-  if (document.userId) {
-    await db
-      .insert(userDocumentTable)
-      .values({
-        userId: document.userId,
-        documentId: document.id,
-        createdAt: document.createdAt ?? new Date(),
-        updatedAt: document.updatedAt ?? new Date(),
-      })
-      .onConflictDoNothing({ target: [userDocumentTable.userId, userDocumentTable.documentId] })
+  if (ownerUserId) {
+    await linkUserToDocument(ownerUserId, document.id, role)
   }
 
   return { success: true }
@@ -84,7 +139,12 @@ export const getUserDocumentCount = async (userId: string) => {
   const result = await db
     .select({ count: count(userDocumentTable.documentId) })
     .from(userDocumentTable)
-    .where(eq(userDocumentTable.userId, userId))
+    .where(
+      and(
+        eq(userDocumentTable.userId, userId),
+        eq(userDocumentTable.role, "owner" as any)
+      )
+    )
 
   return result[0]?.count ? Number(result[0].count) : 0
 }
@@ -93,7 +153,13 @@ export const userHasDocument = async (userId: string, documentId: string) => {
   const result = await db
     .select({ documentId: userDocumentTable.documentId })
     .from(userDocumentTable)
-    .where(and(eq(userDocumentTable.userId, userId), eq(userDocumentTable.documentId, documentId)))
+    .where(
+      and(
+        eq(userDocumentTable.userId, userId),
+        eq(userDocumentTable.documentId, documentId),
+        eq(userDocumentTable.role, "owner" as any)
+      )
+    )
 
   return result.length > 0
 }

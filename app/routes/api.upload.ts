@@ -93,7 +93,7 @@ export async function action({ request }: ActionFunctionArgs) {
             createdAt: now,
             updatedAt: now,
         };
-        await saveDocument(document);
+        await saveDocument(document, userId);
 
         const documentChunks = chunkedDocs.map((doc, index) => ({
           id: crypto.randomUUID(),
@@ -133,7 +133,7 @@ export async function action({ request }: ActionFunctionArgs) {
             createdAt: now,
             updatedAt: now,
         }
-        await saveDocument(document)
+        await saveDocument(document, userId)
         return redirect(`/workspace/document/${documentId}`)
     } finally {
         await unlink(tmpPath).catch(() => { });

@@ -1,5 +1,5 @@
-import { eq, inArray } from "drizzle-orm";
-import { annotation, groupDocumentTable, groupMemberTable } from "~/db/schema";
+import { and, eq, inArray } from "drizzle-orm";
+import { annotation, groupDocumentTable, groupMemberTable, groupTable, userDocumentTable } from "~/db/schema";
 import { db } from "~/server/index.server";
 import type { Annotation, AnnotationCreate, AnnotationRow } from "~/types/types";
 import { NotFoundError } from "./errors.server";
@@ -58,9 +58,31 @@ export const getAnnotations = async (userId: string, documentId: string) => {
         .where(inArray(groupMemberTable.groupId, sharedGroupIds))
       : [];
 
+  const groupOwnerUserIds =
+    sharedGroupIds.length > 0
+      ? await db
+        .select({ ownerId: groupTable.userId })
+        .from(groupTable)
+        .where(inArray(groupTable.id, sharedGroupIds))
+      : [];
+
+  const documentOwnerUserIds = await db
+    .select({ ownerId: userDocumentTable.userId })
+    .from(userDocumentTable)
+    .where(
+      and(
+        eq(userDocumentTable.documentId, documentId),
+        eq(userDocumentTable.role, "owner" as any)
+      )
+    );
+
   const memberIds = [
-    ...new Set(groupMemberUserIds.map((m) => m.userId)),
-    userId,
+    ...new Set([
+      ...groupMemberUserIds.map((m) => m.userId),
+      ...groupOwnerUserIds.map((g) => g.ownerId),
+      ...documentOwnerUserIds.map((o) => o.ownerId),
+      userId,
+    ]),
   ];
 
   const annotations = await db

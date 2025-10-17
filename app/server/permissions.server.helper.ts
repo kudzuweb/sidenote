@@ -5,6 +5,7 @@ import {
   groupMemberTable,
   permissionTable,
   documentTable,
+  userDocumentTable,
   annotation,
   comment,
   chatTable,
@@ -217,14 +218,57 @@ export async function computeAccessLevel(
   const table = resourceTableMap[resourceType]
   if (!table) return "none"
 
-  if (resourceType === "document") return "read" 
-
   const resource = await db
     .select()
     .from(table)
     .where(eq(table.id, resourceId))
 
   if (resource.length === 0) return "none"
+
+  if (resourceType === "document") {
+    const directPerm = await getDirectPermission(userId, resourceType, resourceId)
+    if (directPerm !== "none") return directPerm
+
+    const userDocumentLink = await db
+      .select({ role: userDocumentTable.role })
+      .from(userDocumentTable)
+      .where(
+        and(
+          eq(userDocumentTable.documentId, resourceId),
+          eq(userDocumentTable.userId, userId)
+        )
+      )
+
+    if (userDocumentLink.length > 0) {
+      return userDocumentLink[0].role === "owner" ? "admin" : "read"
+    }
+
+    const permissionPresence = await db
+      .select({ resourceId: permissionTable.resourceId })
+      .from(permissionTable)
+      .where(
+        and(
+          eq(permissionTable.resourceType, "document" as any),
+          eq(permissionTable.resourceId, resourceId)
+        )
+      )
+      .limit(1)
+
+    if (permissionPresence.length === 0) {
+      const userDocumentPresence = await db
+        .select({ documentId: userDocumentTable.documentId })
+        .from(userDocumentTable)
+        .where(eq(userDocumentTable.documentId, resourceId))
+        .limit(1)
+
+      if (userDocumentPresence.length === 0) {
+        // Legacy behaviour: documents without any explicit access rows remain readable.
+        return "read"
+      }
+    }
+
+    return "none"
+  }
 
   // groups
   if (resourceType === "group") {

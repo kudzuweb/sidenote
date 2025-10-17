@@ -29,7 +29,7 @@ export async function action({ request }: Route.ActionArgs) {
     mentions?: { documentIds?: string[], authorIds?: string[] }
   } = await request.json();
 
-  const document = await getDocument(documentId);
+  const document = documentId ? await getDocument(documentId, userId) : null;
   const authors = document ? await getDocumentAuthors(documentId) : [];
   const authorNames = authors.map(a => a.name).join(", ");
 

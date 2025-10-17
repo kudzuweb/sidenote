@@ -10,14 +10,19 @@ export async function action({ request }: ActionFunctionArgs) {
 
 
   const userId = await requireUser(request)
-  try {
-    await ensureDocumentAllowance(userId)
-  } catch (error) {
-    if ((error as any)?.code === "DOCUMENT_LIMIT_REACHED") {
-      throw redirect("/workspace?billing=limit")
+
+  const assertAllowance = async () => {
+    try {
+      await ensureDocumentAllowance(userId)
+    } catch (error) {
+      if ((error as any)?.code === "DOCUMENT_LIMIT_REACHED") {
+        throw redirect("/workspace?billing=limit")
+      }
+      throw error
     }
-    throw error
   }
+
+  await assertAllowance()
   const formData = await request.formData()
   const url = String(formData.get("url") || "").trim()
   const crawl = String(formData.get("crawl") || "").trim() === "on"
@@ -45,6 +50,7 @@ export async function action({ request }: ActionFunctionArgs) {
       const createdIds: string[] = []
       for (const page of pages) {
         if (!page.textContent) continue
+        await assertAllowance()
         const chunkedDocs = await chunkText(page.textContent)
         const chunkTexts = chunkedDocs.map(d => d.pageContent)
         const embeddings = await generateEmbeddings(chunkTexts)
@@ -58,7 +64,7 @@ export async function action({ request }: ActionFunctionArgs) {
           publishedTime: page.publishedTime ?? null,
           createdAt: new Date(),
           updatedAt: new Date(),
-        })
+        }, userId)
         const documentChunks = chunkedDocs.map((doc, index) => ({
           id: crypto.randomUUID(),
           documentId,
@@ -87,7 +93,7 @@ export async function action({ request }: ActionFunctionArgs) {
         publishedTime: pages[0]?.publishedTime ?? null,
         createdAt: new Date(),
         updatedAt: new Date(),
-      })
+      }, userId)
       const documentChunks = chunkedDocs.map((doc, index) => ({
         id: crypto.randomUUID(),
         documentId,
@@ -132,7 +138,7 @@ export async function action({ request }: ActionFunctionArgs) {
     createdAt: new Date(),
     updatedAt: new Date(),
   }
-  await saveDocument(document)
+  await saveDocument(document, userId)
 
   // if (article.byline) {
   //   // split by ',' 'and' '&'
