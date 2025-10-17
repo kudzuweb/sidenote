@@ -74,11 +74,11 @@ export function GroupModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="flex flex-col gap-0 overflow-y-visible p-0 sm:max-w-2xl [&>button:last-child]:top-3.5">
+      <DialogContent className="flex flex-col gap-0 overflow-y-visible p-0 sm:max-w-2xl [&>button:last-child]:top-3.5 border-2">
         {/* Header */}
         <DialogHeader className="contents space-y-0 text-left">
-          <DialogTitle className="border-b px-6 py-4 text-base">
-            {editGroup ? "Edit Group" : "Create New Group"}
+          <DialogTitle className="border-b border-cyan-500/30 dark:border-cyan-400/20 px-6 py-4 text-base uppercase tracking-wider">
+            {editGroup ? "⚡ Edit Group" : "⚡ Create New Group"}
           </DialogTitle>
         </DialogHeader>
         
@@ -93,16 +93,16 @@ export function GroupModal({
           <div className="px-6 pt-6 pb-6">
             {/* Error Display */}
             {error && (
-              <div className="mb-4 rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-                {error}
+              <div className="mb-4 rounded-md border-2 border-pink-500/50 bg-pink-500/10 dark:bg-pink-500/20 px-4 py-3 text-sm text-pink-600 dark:text-pink-400 font-mono">
+                ⚠ {error}
               </div>
             )}
 
             <form className="space-y-6" onSubmit={onSubmit}>
               {/* Group Name */}
               <div className="space-y-2">
-                <Label htmlFor={`${id}-group-name`}>
-                  Group Name <span className="text-destructive">*</span>
+                <Label htmlFor={`${id}-group-name`} className="text-cyan-600 dark:text-cyan-400 font-semibold tracking-wide">
+                  Group Name <span className="text-pink-500 dark:text-pink-400">*</span>
                 </Label>
                 <Input
                   id={`${id}-group-name`}
@@ -112,17 +112,18 @@ export function GroupModal({
                   required
                   disabled={loading}
                   aria-required="true"
+                  className="border-cyan-500/30 dark:border-cyan-400/30 focus:border-cyan-500 dark:focus:border-cyan-400 font-mono"
                 />
               </div>
 
               {/* Members Selection */}
               <div className="space-y-2">
-                <Label htmlFor={`${id}-members`}>
+                <Label htmlFor={`${id}-members`} className="text-purple-600 dark:text-purple-400 font-semibold tracking-wide">
                   Add Members <span className="text-muted-foreground">(Optional)</span>
                 </Label>
-                <div 
+                <div
                   id={`${id}-members`}
-                  className="max-h-48 overflow-y-auto rounded-md border border-input"
+                  className="max-h-48 overflow-y-auto rounded-md border-2 border-purple-500/30 dark:border-purple-400/30 bg-purple-500/5 dark:bg-purple-500/10"
                   role="group"
                   aria-label="Member selection"
                 >
@@ -161,12 +162,12 @@ export function GroupModal({
 
               {/* Documents Selection */}
               <div className="space-y-2">
-                <Label htmlFor={`${id}-documents`}>
+                <Label htmlFor={`${id}-documents`} className="text-pink-600 dark:text-pink-400 font-semibold tracking-wide">
                   Add Documents <span className="text-muted-foreground">(Optional)</span>
                 </Label>
-                <div 
+                <div
                   id={`${id}-documents`}
-                  className="max-h-48 overflow-y-auto rounded-md border border-input"
+                  className="max-h-48 overflow-y-auto rounded-md border-2 border-pink-500/30 dark:border-pink-400/30 bg-pink-500/5 dark:bg-pink-500/10"
                   role="group"
                   aria-label="Document selection"
                 >
@@ -204,7 +205,7 @@ export function GroupModal({
         </div>
 
         {/* Footer with Actions */}
-        <DialogFooter className="flex-row justify-between border-t px-6 py-4">
+        <DialogFooter className="flex-row justify-between border-t border-cyan-500/30 dark:border-cyan-400/20 px-6 py-4 bg-gradient-to-r from-cyan-500/5 via-purple-500/5 to-pink-500/5">
           {/* Delete button (only when editing) */}
           {editGroup && (
             <Button
@@ -212,18 +213,19 @@ export function GroupModal({
               variant="destructive"
               onClick={onDelete}
               disabled={loading}
+              className="bg-gradient-to-r from-pink-600 to-red-600 hover:from-pink-500 hover:to-red-500 border-0 font-semibold tracking-wide"
             >
-              {loading ? "Deleting..." : "Delete Group"}
+              {loading ? "⚡ Deleting..." : "🗑 Delete Group"}
             </Button>
           )}
-          
+
           {/* Spacer when not editing */}
           {!editGroup && <div />}
 
           {/* Right side actions */}
           <div className="flex items-center gap-3">
             <DialogClose asChild>
-              <Button type="button" variant="outline" disabled={loading}>
+              <Button type="button" variant="outline" disabled={loading} className="border-cyan-500/50 dark:border-cyan-400/50 hover:border-cyan-500 dark:hover:border-cyan-400 font-semibold">
                 Cancel
               </Button>
             </DialogClose>
@@ -231,10 +233,11 @@ export function GroupModal({
               type="button"
               onClick={onSubmit}
               disabled={loading || !groupName.trim()}
+              className="bg-gradient-to-r from-cyan-600 to-purple-600 hover:from-cyan-500 hover:to-purple-500 border-0 font-semibold tracking-wide shadow-lg shadow-cyan-500/20"
             >
-              {loading 
-                ? (editGroup ? "Updating..." : "Creating...") 
-                : (editGroup ? "Update Group" : "Create Group")}
+              {loading
+                ? (editGroup ? "⚡ Updating..." : "⚡ Creating...")
+                : (editGroup ? "✓ Update Group" : "✓ Create Group")}
             </Button>
           </div>
         </DialogFooter>

@@ -95,10 +95,12 @@ const Layout = ({ loaderData }: Route.ComponentProps) => {
         <SidebarLeft side="left" data={loaderData} user={uiUser} setTheme={setTheme} theme={theme} />
         <RightSidebarProvider>
           <SidebarInset className="flex flex-col h-screen overflow-y-auto">
-            <header className="sticky top-0 flex h-14 shrink-0 items-center gap-2 z-50 rounded-md">
-              <div className="flex flex-1 justify-between items-center gap-2 px-3">
-                <SidebarTriggerLeft />
-                {/* <Separator orientation="vertical" className="mr-2 h-4" /> */}
+            <header className="sticky top-0 flex h-14 shrink-0 items-center gap-2 z-50 rounded-md backdrop-blur-md bg-background/80 border-b border-cyan-500/20 dark:border-cyan-400/20">
+              <div className="flex flex-1 justify-between items-center gap-2 px-3 relative">
+                {/* Subtle cyber accent line */}
+                <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-cyan-500/30 to-transparent" />
+
+                <SidebarTriggerLeft className="hover:text-cyan-500 dark:hover:text-cyan-400 transition-colors" />
                 <Breadcrumb>
                   <BreadcrumbList>
                     <BreadcrumbItem>
@@ -107,7 +109,7 @@ const Layout = ({ loaderData }: Route.ComponentProps) => {
                     </BreadcrumbItem>
                   </BreadcrumbList>
                 </Breadcrumb>
-                <SidebarTriggerRight />
+                <SidebarTriggerRight className="hover:text-pink-500 dark:hover:text-pink-400 transition-colors" />
               </div>
             </header>
             <Outlet
