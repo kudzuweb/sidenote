@@ -21,11 +21,20 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "~/components/ui/tooltip";
+import {
+  iconButtonClasses,
+  inputShellClasses,
+  secondaryPanelClasses,
+  sectionTitleClasses,
+  tabTriggerClasses,
+} from "~/components/ui/sidebar-theme";
+import { cn } from "~/lib/utils";
 import DocumentList from "./document/DocumentList";
 import GroupList from "./group/GroupList";
 import { GroupModal } from "./group/GroupModal";
 import SearchResultList from "./SearchResultList";
-import { Accordion } from "./ui/accordion";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "./ui/accordion";
+import { ScrollArea } from "./ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import UploadForm from "./upload-form";
 import Logo from "./logo";
@@ -33,7 +42,7 @@ import Logo from "./logo";
 type UIMessagePart = { type: string; text?: string }
 type UIMessage = { role: string; parts: UIMessagePart[] }
 type UserInfo = { name: string; email: string; avatar: string; fallback: string }
-type SidebarAppProps = { setTheme: React.Dispatch<React.SetStateAction<"light" | "dark" >>; theme: "light" | "dark"; data: any; user: UserInfo; side: "left" | "right" } & ComponentProps<typeof Sidebar>
+type SidebarAppProps = { setTheme: React.Dispatch<React.SetStateAction<"light" | "dark">>; theme: "light" | "dark"; data: any; user: UserInfo; side: "left" | "right" } & ComponentProps<typeof Sidebar>
 
 export function SidebarApp({ side, setTheme, theme, data, user, ...props }: SidebarAppProps) {
   const [mode, setMode] = useState("document")
@@ -114,6 +123,24 @@ export function SidebarApp({ side, setTheme, theme, data, user, ...props }: Side
     if (input) input.value = value.trim()
   }
 
+  const hasSearchResults = searchResults.length > 0
+  const isGroupMode = mode === "group"
+  const sidebarListLabel = hasSearchResults
+    ? "Signal Scan"
+    : isGroupMode
+      ? "Collective Nodes"
+      : "Recent Transmission"
+
+  const sidebarListBody = hasSearchResults ? (
+    <SearchResultList results={searchResults} />
+  ) : isGroupMode ? (
+    <Accordion type="single" collapsible className="w-full">
+      <GroupList groups={groups} onEditGroup={handleEditGroup} />
+    </Accordion>
+  ) : (
+    <DocumentList documents={documents} />
+  )
+
   const startBillingRequest = async (intent: "checkout" | "portal") => {
     setBillingError(null)
     setBillingLoading(true)
@@ -160,24 +187,33 @@ export function SidebarApp({ side, setTheme, theme, data, user, ...props }: Side
             {new URLSearchParams(location.search).get("message")}
           </div>
         )}
-        <Tabs defaultValue="tab-1" className="items-center">
-          <div className="flex w-full items-center justify-between">
-            <Button size="icon" variant="ghost" onClick={() => {
-              setGroupId(null)
-              setDocumentId(null)
-            }}>
+        <Tabs defaultValue="tab-1" className="items-center gap-4 text-[#d9dcff]/80">
+          <div className="flex w-full items-center justify-between gap-3">
+            <Button
+              size="icon"
+              variant="ghost"
+              className={iconButtonClasses}
+              onClick={() => {
+                setGroupId(null)
+                setDocumentId(null)
+              }}
+            >
               <ArrowLeft className="h-5 w-5" />
               <span className="sr-only">Back</span>
             </Button>
-            <TabsList>
+            <TabsList className="flex items-center gap-2 rounded-xl border border-[#2a2850]/70 bg-[#090417]/80 p-1 shadow-[0_12px_30px_rgba(8,0,25,0.35)]">
               <Tooltip>
                 <TooltipTrigger asChild>
                   <span>
-                    <TabsTrigger value="tab-1" className="py-3" onClick={() => {
-                      setMode("document")
-                      setGroupId(null)
-                      setDocumentId(null)
-                    }}>
+                    <TabsTrigger
+                      value="tab-1"
+                      className={tabTriggerClasses}
+                      onClick={() => {
+                        setMode("document")
+                        setGroupId(null)
+                        setDocumentId(null)
+                      }}
+                    >
                       <Library size={16} aria-hidden="true" />
                     </TabsTrigger>
                   </span>
@@ -189,11 +225,15 @@ export function SidebarApp({ side, setTheme, theme, data, user, ...props }: Side
               <Tooltip>
                 <TooltipTrigger asChild>
                   <span>
-                    <TabsTrigger value="tab-2" className="group py-3" onClick={() => {
-                      setMode("group")
-                      setGroupId(null)
-                      setDocumentId(null)
-                    }}>
+                    <TabsTrigger
+                      value="tab-2"
+                      className={cn(tabTriggerClasses, "group")}
+                      onClick={() => {
+                        setMode("group")
+                        setGroupId(null)
+                        setDocumentId(null)
+                      }}
+                    >
                       <span className="relative">
                         <Users size={16} aria-hidden="true" />
                       </span>
@@ -207,10 +247,15 @@ export function SidebarApp({ side, setTheme, theme, data, user, ...props }: Side
             </TabsList>
             <Tooltip>
               <TooltipTrigger>
-                <Button size="icon" variant="ghost" onClick={() => {
-                  setEditingGroup(null);
-                  setIsModalOpen(true);
-                }}>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className={iconButtonClasses}
+                  onClick={() => {
+                    setEditingGroup(null);
+                    setIsModalOpen(true);
+                  }}
+                >
                   <UserPlus className="h-5 w-5" />
                   <span className="sr-only">Create New Group</span>
                 </Button>
@@ -228,183 +273,235 @@ export function SidebarApp({ side, setTheme, theme, data, user, ...props }: Side
           </div>
           <TabsContent value="tab-1">
             <div className="flex items-center gap-2">
-              <span className="text-md font-semibold">Reads</span>
+              <span className={sectionTitleClasses}>Reads Circuit</span>
             </div>
           </TabsContent>
           <TabsContent value="tab-2">
             <div className="flex items-center gap-2">
-              <span className="text-md font-semibold">Groups</span>
+              <span className={sectionTitleClasses}>Collective Mesh</span>
             </div>
           </TabsContent>
         </Tabs>
       </SidebarHeader>
-      <SidebarContent>
-        <fetcher.Form method="get" action="/workspace/document-search" onSubmit={handleSearchSubmit}>
-          <div className="flex items-center justify-between">
-            <input className="text-xs py-2 pl-4 pr-2" type="text" name="query" placeholder="Search" value={query} onChange={(e) => { setQuery(e.target.value) }} />
-            {searchResults.length > 0 ?
-              <>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button size="icon" variant="ghost" onClick={() => {
-                      setSearchResults([])
-                      setMode("group")
-                      setQuery("")
-                    }}>
-                      <SearchX className="h-5 w-5" />
-                      <span className="sr-only">Clear Search</span>
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Clear Search</p>
-                  </TooltipContent>
-                </Tooltip>
-              </>
-              :
-              <>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button size="icon" variant="ghost" type="submit">
-                      <Search className="h-5 w-5" />
-                      <span className="sr-only">Search</span>
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Search</p>
-                  </TooltipContent>
-                </Tooltip>
-              </>
-            }
+      <SidebarContent className="flex-1">
+        <div className="flex h-full flex-col gap-4 px-3 py-4">
+          <div className="space-y-3">
+            <fetcher.Form
+              method="get"
+              action="/workspace/document-search"
+              className="space-y-3"
+              onSubmit={handleSearchSubmit}
+            >
+              <div className={cn(secondaryPanelClasses, "flex w-full items-center gap-2")}>
+                <input
+                  className={cn(inputShellClasses, "flex-1 min-w-0")}
+                  type="text"
+                  name="query"
+                  placeholder="Search Signal"
+                  value={query}
+                  onChange={(e) => {
+                    setQuery(e.target.value)
+                  }}
+                />
+                {hasSearchResults ? (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className={cn(iconButtonClasses, "shrink-0")}
+                        onClick={() => {
+                          setSearchResults([])
+                          setMode("group")
+                          setQuery("")
+                        }}
+                      >
+                        <SearchX className="h-5 w-5" />
+                        <span className="sr-only">Clear Search</span>
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Clear Search</p>
+                    </TooltipContent>
+                  </Tooltip>
+                ) : (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        type="submit"
+                        disabled={documentLimitReached}
+                        className={cn(iconButtonClasses, "shrink-0")}
+                      >
+                        <Search className="h-5 w-5" />
+                        <span className="sr-only">Search</span>
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Search</p>
+                    </TooltipContent>
+                  </Tooltip>
+                )}
+              </div>
+            </fetcher.Form>
+            <Accordion type="single" collapsible className="w-full">
+              <AccordionItem value="document-intake" className="w-full">
+                <AccordionTrigger className="w-full rounded-xl border border-[#26224a]/70 bg-[#0b0618]/80 px-3 py-2 text-[0.7rem] font-mono uppercase tracking-[0.18em] text-[#8ffcff]/80 hover:text-white">
+                  <span className="flex items-center gap-2">
+                    <FilePlus2 className="h-4 w-4 shrink-0 text-[#71fff6]" />
+                    Document Intake
+                  </span>
+                </AccordionTrigger>
+                <AccordionContent className="space-y-3">
+                  <Form
+                    method="post"
+                    action="document-create"
+                    onSubmit={handleNewDocSubmit}
+                    autoComplete="off"
+                    className="space-y-3"
+                  >
+                    <div className={cn(secondaryPanelClasses, "grid w-full gap-3")}>
+                      <div className="flex items-center gap-2">
+                        <input
+                          className={cn(inputShellClasses, "flex-1 min-w-0")}
+                          type="text"
+                          name="url"
+                          value={url}
+                          onInput={handleUrlInput}
+                          placeholder="Beam in via URL"
+                        />
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              type="submit"
+                              className={cn(iconButtonClasses, "shrink-0")}
+                            >
+                              <FilePlus2 className="h-5 w-5" />
+                              <span className="sr-only">Add Read</span>
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Add Read</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                      <div className="grid gap-2 text-[#8ffcff]/70">
+                        <label className="flex items-center gap-2 font-mono text-[0.65rem] uppercase tracking-[0.12em]">
+                          <input
+                            type="checkbox"
+                            name="crawl"
+                            className="size-4 rounded border border-[#343065]/70 bg-[#050711]/90 accent-[#ff5688] focus:outline-none focus:ring-2 focus:ring-[#6efff4]/30"
+                          />
+                          Crawl site
+                        </label>
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          <input
+                            className={cn(inputShellClasses, "w-full text-center")}
+                            type="number"
+                            name="maxPages"
+                            min={1}
+                            max={200}
+                            placeholder="25"
+                          />
+                          <select
+                            name="splitMode"
+                            className={cn(inputShellClasses, "w-full bg-[#050711]/90 text-xs")}
+                          >
+                            <option value="aggregate">One document</option>
+                            <option value="split">One per page</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                  </Form>
+                  <div className="w-full">
+                    <UploadForm disabled={documentLimitReached} />
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
           </div>
-        </fetcher.Form>
-        <Form method="post" action="document-create" onSubmit={handleNewDocSubmit} autoComplete="off">
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <input className="text-xs py-2 pl-4 pr-2" type="text" name="url" value={url} onInput={handleUrlInput} disabled={documentLimitReached} placeholder="Add Read by URL" />
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button size="icon" variant="ghost" type="submit" disabled={documentLimitReached}>
-                    <FilePlus2 className="h-5 w-5" />
-                    <span className="sr-only">Add Read</span>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Add Read</p>
-                </TooltipContent>
-              </Tooltip>
-            </div>
-            <div className="flex items-center justify-between gap-2">
-              <label className="flex items-center gap-2 text-xs">
-                <input type="checkbox" name="crawl" />
-                Crawl site
-              </label>
-              <input className="text-xs py-1 px-2 w-20" type="number" name="maxPages" min={1} max={200} placeholder="25" />
-              <select name="splitMode" className="text-xs py-1 px-2">
-                <option value="aggregate">One document</option>
-                <option value="split">One per page</option>
-              </select>
-            </div>
-          </div>
-        </Form>
-        <UploadForm disabled={documentLimitReached} />
-        {limitInfo && (
-          <div className="space-y-2 rounded-md border border-dashed border-muted-foreground/40 bg-muted/30 px-3 py-2 text-xs">
-            {!isSubscribed ? (
-              <>
-                <div className="flex items-center gap-2">
-                  <Sparkles className="h-4 w-4 text-muted-foreground" />
-                  <p className="font-semibold text-muted-foreground">
-                    {documentLimitReached
-                      ? `Free plan limit reached (${limitInfo.limit} documents).`
-                      : `Free plan: ${documentsRemaining ?? limitInfo.limit
-                      } document${documentsRemaining === 1 ? "" : "s"} remaining.`}
-                  </p>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
+          {limitInfo && (
+            <div className="space-y-2 rounded-md border border-dashed border-muted-foreground/40 bg-muted/30 px-3 py-2 text-xs">
+              {!isSubscribed ? (
+                <>
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-muted-foreground" />
+                    <p className="font-semibold text-muted-foreground">
+                      {documentLimitReached
+                        ? `Free plan limit reached (${limitInfo.limit} documents).`
+                        : `Free plan: ${documentsRemaining ?? limitInfo.limit
+                        } document${documentsRemaining === 1 ? "" : "s"} remaining.`}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      size="sm"
+                      type="button"
+                      onClick={handleUpgrade}
+                      disabled={billingLoading}
+                    >
+                      {billingLoading ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Redirecting…
+                        </>
+                      ) : (
+                        <>
+                          <CreditCard className="mr-2 h-4 w-4" />
+                          Upgrade to Pro
+                        </>
+                      )}
+                    </Button>
+                    <p className="text-muted-foreground">
+                      Unlimited documents plus priority support.
+                    </p>
+                  </div>
+                </>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-muted-foreground" />
+                    <p className="font-semibold text-muted-foreground">Pro plan active</p>
+                  </div>
                   <Button
                     size="sm"
                     type="button"
-                    onClick={handleUpgrade}
+                    variant="outline"
+                    onClick={handleManageBilling}
                     disabled={billingLoading}
                   >
                     {billingLoading ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Redirecting…
+                        Opening portal…
                       </>
                     ) : (
                       <>
                         <CreditCard className="mr-2 h-4 w-4" />
-                        Upgrade to Pro
+                        Manage Billing
                       </>
                     )}
                   </Button>
-                  <p className="text-muted-foreground">
-                    Unlimited documents plus priority support.
-                  </p>
                 </div>
-              </>
-            ) : (
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="h-4 w-4 text-muted-foreground" />
-                  <p className="font-semibold text-muted-foreground">Pro plan active</p>
-                </div>
-                <Button
-                  size="sm"
-                  type="button"
-                  variant="outline"
-                  onClick={handleManageBilling}
-                  disabled={billingLoading}
-                >
-                  {billingLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Opening portal…
-                    </>
-                  ) : (
-                    <>
-                      <CreditCard className="mr-2 h-4 w-4" />
-                      Manage Billing
-                    </>
-                  )}
-                </Button>
-              </div>
-            )}
-            {billingError && <p className="text-destructive">{billingError}</p>}
-          </div>
-        )}
-        <SidebarSeparator />
-      </SidebarContent>
-      <SidebarContent>
-        <div className="flex flex-col gap-4">
-          <SidebarGroup>
-            {searchResults.length > 0 ?
-              <>
-                <SidebarGroupLabel>Search Results</SidebarGroupLabel>
-                <SidebarMenu>
-                  <SearchResultList results={searchResults} />
+              )}
+              {billingError && <p className="text-destructive">{billingError}</p>}
+            </div>
+          )}
+          <SidebarSeparator />
+          <div className="flex-1">
+            <SidebarGroup className="flex h-full flex-col">
+              <SidebarGroupLabel>{sidebarListLabel}</SidebarGroupLabel>
+              <ScrollArea className="mt-2 flex-1 pr-1">
+                <SidebarMenu className="w-full">
+                  {sidebarListBody}
                 </SidebarMenu>
-              </>
-              :
-              mode === "document" ?
-                <>
-                  <SidebarGroupLabel>Recent</SidebarGroupLabel>
-                  <SidebarMenu>
-                    <DocumentList documents={documents} />
-                  </SidebarMenu>
-                </>
-                : mode === "group" &&
-                <>
-                  <SidebarGroupLabel>Recent</SidebarGroupLabel>
-                  <SidebarMenu>
-                    <Accordion type="single" collapsible className="w-full" defaultValue="3">
-                      <GroupList groups={groups} onEditGroup={handleEditGroup} />
-                    </Accordion>
-                  </SidebarMenu>
-                </>
-            }
-          </SidebarGroup>
+              </ScrollArea>
+            </SidebarGroup>
+          </div>
         </div>
       </SidebarContent>
       <SidebarRail />

@@ -1,16 +1,10 @@
 import { MessageCircle } from "lucide-react";
 import {
-  Sidebar,
-  SidebarContent,
-  SidebarFooter,
   SidebarGroup,
   SidebarGroupLabel,
-  SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarRail,
-  useSidebar,
 } from "~/components/ui/sidebar-right";
 
 const convertMessages = (messages) => {
@@ -29,7 +23,7 @@ const convertMessages = (messages) => {
 const ChatList = (props: {chats, setSelectedChatId}) => {
   return (
     <SidebarGroup>
-      <SidebarGroupLabel>Recent</SidebarGroupLabel>
+      <SidebarGroupLabel>Signal Threads</SidebarGroupLabel>
       <SidebarMenu>
         {props.chats.map((chat: ChatListItem) => {
           let title = "New chat"

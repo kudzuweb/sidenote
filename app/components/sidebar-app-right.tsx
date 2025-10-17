@@ -1,17 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useState, type MutableRefObject } from "react";
+import type { ComponentProps } from "react";
+import { ArrowLeft, Highlighter, MessageCircle, MessageCirclePlus } from "lucide-react"
+import { Form, useFetcher, useParams } from "react-router";
+
+import ChatBlock from "~/chat/chat-block";
 import { Button } from "~/components/ui/button";
 import {
   Sidebar,
   SidebarContent,
-  SidebarFooter,
-  SidebarGroup,
-  SidebarGroupLabel,
   SidebarHeader,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
   SidebarRail,
   useSidebar,
 } from "~/components/ui/sidebar-right";
@@ -21,21 +20,21 @@ import {
   TooltipTrigger,
   TooltipProvider
 } from "~/components/ui/tooltip";
-import { NavUser } from "~/components/nav-user";
-import { ArrowLeft, MessageCircle, MessageCirclePlus, BoxIcon, HouseIcon, PanelsTopLeftIcon, Highlighter } from "lucide-react"
-import type { ComponentProps } from "react";
-import { Form, useFetcher, useParams } from "react-router";
-import ChatBlock from "~/chat/chat-block";
-import AvatarGroupBottomDemo from "./groupavatar";
-import ChatList from "./ChatList";
-import AnnotationList from "./AnnotationList";
+import {
+  iconButtonClasses,
+  secondaryPanelClasses,
+  sectionTitleClasses,
+  tabTriggerClasses,
+} from "~/components/ui/sidebar-theme";
 import {
   Tabs,
   TabsContent,
   TabsList,
   TabsTrigger,
 } from "~/components/ui/tabs"
-import GroupAvatarStack from "./groupavatar";
+import { cn } from "~/lib/utils";
+import ChatList from "./ChatList";
+import AnnotationList from "./AnnotationList";
 
 type UIMessagePart = { type: string; text?: string }
 type UIMessage = { role: string; parts: UIMessagePart[] }
@@ -136,25 +135,38 @@ export function SidebarApp({ side, data, user, selectionRef, includeSelection, s
   }, [selectedChat])
 
   return (
-    <Sidebar className="border-r-0" {...props} side="right">
+    <Sidebar className="border-l-0" {...props} side="right">
       <SidebarHeader>
-        <Tabs value={tabsValue} onValueChange={(value) => setTabsValue(value as "tab-1" | "tab-2")} className="items-center">
-          <div className="flex w-full items-center justify-between">
-            <Button size="icon" variant="ghost" onClick={() => setSelectedChatId(null)}>
+        <Tabs
+          value={tabsValue}
+          onValueChange={(value) => setTabsValue(value as "tab-1" | "tab-2")}
+          className="items-center gap-4 text-[#d9dcff]/80"
+        >
+          <div className="flex w-full items-center justify-between gap-3">
+            <Button
+              size="icon"
+              variant="ghost"
+              className={iconButtonClasses}
+              onClick={() => setSelectedChatId(null)}
+            >
               <ArrowLeft className="h-5 w-5" />
               <span className="sr-only">Back</span>
             </Button>
-            <TabsList>
+            <TabsList className="flex items-center gap-2 rounded-xl border border-[#2a2850]/70 bg-[#090417]/80 p-1 shadow-[0_12px_30px_rgba(8,0,25,0.35)]">
               <TooltipProvider delayDuration={0}>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <span>
-                      <TabsTrigger value="tab-1" className="py-3" onClick={() => {
-                        setTabsValue("tab-1")
-                        setMode("annotation")
-                        setSelectedChatId(null)
-                        setSelectedAnnotationId(null)
-                      }}>
+                      <TabsTrigger
+                        value="tab-1"
+                        className={tabTriggerClasses}
+                        onClick={() => {
+                          setTabsValue("tab-1")
+                          setMode("annotation")
+                          setSelectedChatId(null)
+                          setSelectedAnnotationId(null)
+                        }}
+                      >
                         <Highlighter size={16} aria-hidden="true" />
                       </TabsTrigger>
                     </span>
@@ -168,12 +180,16 @@ export function SidebarApp({ side, data, user, selectionRef, includeSelection, s
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <span>
-                      <TabsTrigger value="tab-2" className="group py-3" onClick={() => {
-                        setTabsValue("tab-2")
-                        setMode("chat")
-                        setSelectedChatId(null)
-                        setSelectedAnnotationId(null)
-                      }}>
+                      <TabsTrigger
+                        value="tab-2"
+                        className={cn(tabTriggerClasses, "group")}
+                        onClick={() => {
+                          setTabsValue("tab-2")
+                          setMode("chat")
+                          setSelectedChatId(null)
+                          setSelectedAnnotationId(null)
+                        }}
+                      >
                         <span className="relative">
                           <MessageCircle size={16} aria-hidden="true" />
                         </span>
@@ -191,7 +207,12 @@ export function SidebarApp({ side, data, user, selectionRef, includeSelection, s
             <Form method="post" action={`/workspace/document/${useParams().id}/chat-create`}>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button size="icon" variant="ghost" type="submit">
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    type="submit"
+                    className={iconButtonClasses}
+                  >
                     <MessageCirclePlus className="h-5 w-5" />
                     <span className="sr-only">New Chat</span>
                   </Button>
@@ -204,29 +225,47 @@ export function SidebarApp({ side, data, user, selectionRef, includeSelection, s
           </div>
           <TabsContent value="tab-1">
             <div className="flex items-center gap-2">
-              <span className="text-md font-semibold">Annotations</span>
+              <span className={sectionTitleClasses}>Annotations Mesh</span>
             </div>
           </TabsContent>
           <TabsContent value="tab-2">
             <div className="flex items-center gap-2">
-              <span className="text-md font-semibold">{headerTitle}</span>
+              <span className={sectionTitleClasses}>
+                {selectedChat ? "Chat Thread" : "Chats Uplink"}
+              </span>
+              {selectedChat && (
+                <span className="line-clamp-1 text-xs text-[#9ba2ff]/80">
+                  {headerTitle}
+                </span>
+              )}
             </div>
           </TabsContent>
         </Tabs>
       </SidebarHeader>
       <SidebarContent>
         <div className="flex flex-col gap-4">
-          {!selectedChat && mode === "chat" && (
+          {mode === "annotation" && (
+            <AnnotationList
+              annotations={annotations}
+              setSelectedAnnotationId={setSelectedAnnotationId}
+            />
+          )}
+          {mode === "chat" && !selectedChat && (
             <ChatList chats={chats} setSelectedChatId={setSelectedChatId} />
           )}
-          {selectedChat && mode === "chat" && (
-            <div className="h-full">
-              <ChatBlock chatId={selectedChat.id} initialMessages={selectedChatMessages} docId={useParams().id as string} selectionRef={selectionRef} includeSelection={includeSelection} setIncludeSelection={setIncludeSelection} />
+          {mode === "chat" && selectedChat && (
+            <div className={cn(secondaryPanelClasses, "h-full overflow-hidden p-0")}>
+              <div className="h-full overflow-hidden rounded-lg border border-[#2c2855]/70 bg-[#05040f]/90">
+                <ChatBlock
+                  chatId={selectedChat.id}
+                  initialMessages={selectedChatMessages}
+                  docId={useParams().id as string}
+                  selectionRef={selectionRef}
+                  includeSelection={includeSelection}
+                  setIncludeSelection={setIncludeSelection}
+                />
+              </div>
             </div>
-          )}
-          {mode === "annotation" && (
-            <AnnotationList annotations={annotations} setSelectedAnnotationId={setSelectedAnnotationId} />
-
           )}
         </div>
       </SidebarContent>

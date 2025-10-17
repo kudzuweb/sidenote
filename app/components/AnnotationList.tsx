@@ -1,16 +1,8 @@
-import { Highlighter, MessageCircle } from "lucide-react";
+import { Highlighter } from "lucide-react";
 import {
-  Sidebar,
-  SidebarContent,
-  SidebarFooter,
   SidebarGroup,
   SidebarGroupLabel,
-  SidebarHeader,
   SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarRail,
-  useSidebar,
   SidebarListButton,
   SidebarListItem
 } from "~/components/ui/sidebar-right";
@@ -31,6 +23,7 @@ function scrollToAnnotation(annid: string) {
 const AnnotationList = (props: {annotations, setSelectedAnnotationId}) => {
   return (
     <SidebarGroup>
+      <SidebarGroupLabel>Annotation Stream</SidebarGroupLabel>
       <SidebarMenu>
         {props.annotations?.sort((a: AnnotationListItem, b: AnnotationListItem) => a.start - b.start).map((annotation: AnnotationListItem) => {
           return (
