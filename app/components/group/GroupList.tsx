@@ -13,7 +13,7 @@ const GroupList = (props: { groups, onEditGroup }) => {
   return (
     <>
       {props?.groups?.map(
-        (group: { id: string, name?: string | null }) => {
+        (group: { id: string, name?: string | null, members?: any[], documents?: any[] }) => {
           const name = (group.name && group.name.trim().length > 0)
             ? group.name
             : (group.id)
@@ -21,20 +21,25 @@ const GroupList = (props: { groups, onEditGroup }) => {
             <Tooltip>
               <TooltipTrigger asChild>
                 <AccordionItem value={group.id} key={group.id} className="w-full">
-                  <AccordionTrigger className="w-full">
-                    <SidebarMenuButton className="flex w-full items-start gap-2 px-2 py-2 text-xs">
-                      <div className="flex w-full min-w-0 flex-col gap-2">
-                        <div className="flex-1 overflow-hidden">
-                          <span className="line-clamp-2 leading-snug break-words text-left overflow-hidden text-ellipsis whitespace-normal">
+                  <AccordionTrigger className="w-full [&>button]:w-full">
+                    <SidebarMenuButton className="w-full px-2 py-3 h-auto">
+                      <div className="flex w-full flex-col gap-3">
+                        <div className="w-full text-left">
+                          <span className="line-clamp-2 leading-snug break-words whitespace-normal text-xs">
                             {name}
                           </span>
                         </div>
-                        <div className="flex w-full flex-row items-center justify-between">
-                          <GroupAvatarStack users={group?.members} />
+                        <div className="flex w-full flex-row items-center gap-2">
+                          {group?.members && group.members.length > 0 && (
+                            <div className="flex-shrink-0">
+                              <GroupAvatarStack users={group.members} />
+                            </div>
+                          )}
+                          <div className="flex-1" />
                           <Button
                             size="icon"
                             variant="ghost"
-                            className="mt-[2px] flex h-5 w-5 shrink-0 p-0"
+                            className="h-6 w-6 shrink-0"
                             onClick={(e) => {
                               e.stopPropagation();
                               props.onEditGroup({
@@ -45,7 +50,7 @@ const GroupList = (props: { groups, onEditGroup }) => {
                               });
                             }}
                           >
-                            <Pencil className="mr-2 h-4 w-4 shrink-0 mt-[2px]" />
+                            <Pencil className="h-4 w-4" />
                           </Button>
                         </div>
                       </div>
