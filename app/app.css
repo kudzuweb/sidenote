@@ -352,4 +352,32 @@ body {
     80% { transform: translate(-2px, 2px); }
     100% { transform: translate(0); }
   }
+
+  @keyframes cyber-glow-pulse {
+    0%, 100% {
+      box-shadow: 0 0 20px rgba(0,0,0,0.3),
+                  0 0 40px rgba(0,0,0,0.1),
+                  inset 0 1px 0 rgba(255,255,255,0.1);
+    }
+    50% {
+      box-shadow: 0 0 30px rgba(0,0,0,0.4),
+                  0 0 60px rgba(0,0,0,0.2),
+                  inset 0 1px 0 rgba(255,255,255,0.15),
+                  0 0 80px rgba(var(--accent), 0.1);
+    }
+  }
+
+  @keyframes scan-line {
+    0% {
+      transform: translateY(-100%);
+    }
+    100% {
+      transform: translateY(100%);
+    }
+  }
+
+  @keyframes terminal-flicker {
+    0%, 100% { opacity: 0.95; }
+    50% { opacity: 1; }
+  }
 }
