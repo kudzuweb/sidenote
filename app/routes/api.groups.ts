@@ -14,7 +14,7 @@ import {
   listGroupDocuments,
 } from "~/server/groups.server";
 import { getAllUsers } from "~/server/users.server";
-import { getAllDocuments } from "~/server/documents.server";
+import { getDocuments } from "~/server/documents.server";
 import { BadRequestError, ForbiddenError, NotFoundError } from "~/server/errors.server";
 import type { ApiError, ApiSuccess, GroupCreate } from "~/types/types";
 
@@ -95,7 +95,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     }
 
     if (action === "allDocuments") {
-      const documents = await getAllDocuments();
+      const documents = await getDocuments(userId);
       const formattedDocuments = documents.map(doc => ({
         id: doc.id,
         title: doc.title,

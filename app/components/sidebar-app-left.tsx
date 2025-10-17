@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, FilePlus2, Library, Search, SearchX, UserPlus, Users } from "lucide-react";
+import { ArrowLeft, CreditCard, FilePlus2, Library, Loader2, Search, SearchX, Sparkles, UserPlus, Users } from "lucide-react";
 import { useEffect, useState, type ComponentProps } from "react";
 import { Form, useFetcher, useRevalidator, useLocation } from "react-router";
 import { NavUser } from "~/components/nav-user";
@@ -42,7 +42,7 @@ import Logo from "./logo";
 type UIMessagePart = { type: string; text?: string }
 type UIMessage = { role: string; parts: UIMessagePart[] }
 type UserInfo = { name: string; email: string; avatar: string; fallback: string }
-type SidebarAppProps = { setTheme: React.Dispatch<React.SetStateAction<"light" | "dark" >>; theme: "light" | "dark"; data: any; user: UserInfo; side: "left" | "right" } & ComponentProps<typeof Sidebar>
+type SidebarAppProps = { setTheme: React.Dispatch<React.SetStateAction<"light" | "dark">>; theme: "light" | "dark"; data: any; user: UserInfo; side: "left" | "right" } & ComponentProps<typeof Sidebar>
 
 export function SidebarApp({ side, setTheme, theme, data, user, ...props }: SidebarAppProps) {
   const [mode, setMode] = useState("document")
@@ -58,6 +58,8 @@ export function SidebarApp({ side, setTheme, theme, data, user, ...props }: Side
   const [editingGroup, setEditingGroup] = useState(null);
   const [groups, setGroups] = useState(data.groups)
   const [documents, setDocuments] = useState(data.documents)
+  const [billingError, setBillingError] = useState<string | null>(null);
+  const [billingLoading, setBillingLoading] = useState(false);
 
   const handleEditGroup = (group: any) => {
     setEditingGroup(group);
@@ -73,7 +75,11 @@ export function SidebarApp({ side, setTheme, theme, data, user, ...props }: Side
     if (data?.documents) setDocuments(data.documents)
     if (data?.groups) setGroups(data.groups)
   }, [data])
-  
+
+  const limitInfo = data?.documentLimit;
+  const documentLimitReached = limitInfo ? !limitInfo.allowed : false;
+  const documentsRemaining = limitInfo?.remaining === Infinity ? null : limitInfo?.remaining;
+  const isSubscribed = limitInfo?.subscribed ?? false;
 
   useEffect(() => {
     if (fetcher.data && fetcher.data.length > 0) {
@@ -102,6 +108,10 @@ export function SidebarApp({ side, setTheme, theme, data, user, ...props }: Side
 
   const handleNewDocSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     // event.preventDefault()
+    if (documentLimitReached) {
+      event.preventDefault()
+      return
+    }
     const form = event.currentTarget as HTMLFormElement
 
     const input = form.querySelector('input[name="url"]') as HTMLInputElement
@@ -130,6 +140,43 @@ export function SidebarApp({ side, setTheme, theme, data, user, ...props }: Side
   ) : (
     <DocumentList documents={documents} />
   )
+
+  const startBillingRequest = async (intent: "checkout" | "portal") => {
+    setBillingError(null)
+    setBillingLoading(true)
+    try {
+      const response = await fetch("/api/billing", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ intent }),
+      })
+      const payload = await response.json()
+
+      if (!response.ok) {
+        throw new Error(payload?.error || "Unable to start billing")
+      }
+
+      if (payload.alreadySubscribed) {
+        setBillingError("Your subscription is already active.")
+        return
+      }
+
+      if (payload?.url) {
+        window.location.href = payload.url
+        return
+      }
+
+      throw new Error("Billing response missing redirect URL.")
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Billing request failed"
+      setBillingError(message)
+    } finally {
+      setBillingLoading(false)
+    }
+  }
+
+  const handleUpgrade = () => startBillingRequest("checkout")
+  const handleManageBilling = () => startBillingRequest("portal")
 
   return (
     <Sidebar className="border-r-0" {...props} side="left">
@@ -284,6 +331,7 @@ export function SidebarApp({ side, setTheme, theme, data, user, ...props }: Side
                         size="icon"
                         variant="ghost"
                         type="submit"
+                        disabled={documentLimitReached}
                         className={cn(iconButtonClasses, "shrink-0")}
                       >
                         <Search className="h-5 w-5" />
@@ -370,12 +418,79 @@ export function SidebarApp({ side, setTheme, theme, data, user, ...props }: Side
                     </div>
                   </Form>
                   <div className="w-full">
-                    <UploadForm />
+                    <UploadForm disabled={documentLimitReached} />
                   </div>
                 </AccordionContent>
               </AccordionItem>
             </Accordion>
           </div>
+          {limitInfo && (
+            <div className="space-y-2 rounded-md border border-dashed border-muted-foreground/40 bg-muted/30 px-3 py-2 text-xs">
+              {!isSubscribed ? (
+                <>
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-muted-foreground" />
+                    <p className="font-semibold text-muted-foreground">
+                      {documentLimitReached
+                        ? `Free plan limit reached (${limitInfo.limit} documents).`
+                        : `Free plan: ${documentsRemaining ?? limitInfo.limit
+                        } document${documentsRemaining === 1 ? "" : "s"} remaining.`}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      size="sm"
+                      type="button"
+                      onClick={handleUpgrade}
+                      disabled={billingLoading}
+                    >
+                      {billingLoading ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Redirecting…
+                        </>
+                      ) : (
+                        <>
+                          <CreditCard className="mr-2 h-4 w-4" />
+                          Upgrade to Pro
+                        </>
+                      )}
+                    </Button>
+                    <p className="text-muted-foreground">
+                      Unlimited documents plus priority support.
+                    </p>
+                  </div>
+                </>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-muted-foreground" />
+                    <p className="font-semibold text-muted-foreground">Pro plan active</p>
+                  </div>
+                  <Button
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                    onClick={handleManageBilling}
+                    disabled={billingLoading}
+                  >
+                    {billingLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Opening portal…
+                      </>
+                    ) : (
+                      <>
+                        <CreditCard className="mr-2 h-4 w-4" />
+                        Manage Billing
+                      </>
+                    )}
+                  </Button>
+                </div>
+              )}
+              {billingError && <p className="text-destructive">{billingError}</p>}
+            </div>
+          )}
           <SidebarSeparator />
           <div className="flex-1">
             <SidebarGroup className="flex h-full flex-col">

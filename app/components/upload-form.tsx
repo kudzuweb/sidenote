@@ -2,11 +2,16 @@
 import { Upload } from "lucide-react";
 import { useState } from "react";
 import { Form } from "react-router";
-
+import { Tooltip, TooltipTrigger, TooltipContent } from "./ui/tooltip";
 import { Button } from "./ui/button";
 
-export default function UploadForm() {
+type UploadFormProps = {
+  disabled?: boolean;
+};
+
+export default function UploadForm({ disabled }: UploadFormProps) {
   const [fileName, setFileName] = useState<string>("");
+  const isDisabled = !!disabled;
 
   return (
     <Form
@@ -22,6 +27,7 @@ export default function UploadForm() {
         accept=".pdf,application/pdf,.epub,application/epub+zip"
         required
         className="sr-only"
+        disabled={isDisabled}
         onChange={(event) => {
           const selectedFile = event.currentTarget.files?.[0];
           setFileName(selectedFile ? selectedFile.name : "");
@@ -29,7 +35,7 @@ export default function UploadForm() {
       />
       <label
         htmlFor="file"
-        className="flex cursor-pointer flex-col gap-3 rounded-lg border border-dashed border-[#343065]/70 bg-[#100825]/80 px-4 py-4 transition-all duration-200 ease-out hover:border-[#71fff6]/60 hover:bg-[#140c31]/90"
+        className={`flex cursor-pointer flex-col gap-3 rounded-lg border border-dashed border-[#343065]/70 bg-[#100825]/80 px-4 py-4 transition-all duration-200 ease-out hover:border-[#71fff6]/60 hover:bg-[#140c31]/90 ${isDisabled ? "opacity-50 cursor-not-allowed" : ""}`}
       >
         <span className="font-mono text-[0.7rem] uppercase tracking-[0.18em] text-[#8ffcff]/70">
           {fileName ? "Selected Transmission" : "Drop A Read"}
@@ -45,7 +51,8 @@ export default function UploadForm() {
         <Button
           type="submit"
           variant="ghost"
-          className="rounded-lg border border-[#ff5688]/70 bg-[#150c32]/90 px-4 py-2 font-mono text-xs uppercase tracking-[0.16em] text-white transition-all duration-200 ease-out hover:border-[#71fff6]/60 hover:bg-[#1d1040]/95 focus-visible:ring-2 focus-visible:ring-[#71fff6]/40 focus-visible:ring-offset-1 focus-visible:ring-offset-[#070314]"
+          className="rounded-lg border border-[#ff5688]/70 bg-[#150c32]/90 px-4 py-2 font-mono text-xs uppercase tracking-[0.16em] text-white transition-all duration-200 ease-out hover:border-[#71fff6]/60 hover:bg-[#1d1040]/95 focus-visible:ring-2 focus-visible:ring-[#71fff6]/40 focus-visible:ring-offset-1 focus-visible:ring-offset-[#070314] disabled:opacity-50 disabled:cursor-not-allowed"
+          disabled={isDisabled}
         >
           Transmit
         </Button>

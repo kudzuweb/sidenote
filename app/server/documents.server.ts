@@ -1,6 +1,6 @@
-import { comment, documentChunksTable, documentTable } from "~/db/schema"
+import { documentChunksTable, documentTable, userDocumentTable } from "~/db/schema"
 import { db } from "~/server/index.server"
-import { eq } from "drizzle-orm"
+import { and, eq, count } from "drizzle-orm"
 import type { Document, DocumentCreate, DocumentChunk, DocumentRow } from "~/types/types"
 
 export const getAllDocuments = async (): Promise<DocumentRow[]> => {
@@ -8,8 +8,26 @@ export const getAllDocuments = async (): Promise<DocumentRow[]> => {
   return results
 }
 
-export const getDocuments = async () => {
-  const results = await db.select().from(documentTable)
+export const getDocuments = async (userId?: string) => {
+  if (!userId) {
+    return db.select().from(documentTable)
+  }
+
+  const results = await db
+    .select({
+      id: documentTable.id,
+      url: documentTable.url,
+      title: documentTable.title,
+      content: documentTable.content,
+      textContent: documentTable.textContent,
+      publishedTime: documentTable.publishedTime,
+      createdAt: documentTable.createdAt,
+      updatedAt: documentTable.updatedAt,
+    })
+    .from(userDocumentTable)
+    .innerJoin(documentTable, eq(userDocumentTable.documentId, documentTable.id))
+    .where(eq(userDocumentTable.userId, userId))
+
   return results
 }
 
@@ -28,7 +46,24 @@ export const getDocument = async (id: string) => {
 
 export const saveDocument = async (document: DocumentCreate) => {
   const dbDocument = documentObjectToRow(document)
-  return await db.insert(documentTable).values(dbDocument).onConflictDoUpdate({ target: documentTable.id, set: dbDocument })
+  await db
+    .insert(documentTable)
+    .values(dbDocument)
+    .onConflictDoUpdate({ target: documentTable.id, set: dbDocument })
+
+  if (document.userId) {
+    await db
+      .insert(userDocumentTable)
+      .values({
+        userId: document.userId,
+        documentId: document.id,
+        createdAt: document.createdAt ?? new Date(),
+        updatedAt: document.updatedAt ?? new Date(),
+      })
+      .onConflictDoNothing({ target: [userDocumentTable.userId, userDocumentTable.documentId] })
+  }
+
+  return { success: true }
 }
 
 export const saveDocumentChunks = async (chunks: DocumentChunk[]) => {
@@ -43,6 +78,24 @@ export const saveDocumentChunks = async (chunks: DocumentChunk[]) => {
   }))
 
   return await db.insert(documentChunksTable).values(dbChunks)
+}
+
+export const getUserDocumentCount = async (userId: string) => {
+  const result = await db
+    .select({ count: count(userDocumentTable.documentId) })
+    .from(userDocumentTable)
+    .where(eq(userDocumentTable.userId, userId))
+
+  return result[0]?.count ? Number(result[0].count) : 0
+}
+
+export const userHasDocument = async (userId: string, documentId: string) => {
+  const result = await db
+    .select({ documentId: userDocumentTable.documentId })
+    .from(userDocumentTable)
+    .where(and(eq(userDocumentTable.userId, userId), eq(userDocumentTable.documentId, documentId)))
+
+  return result.length > 0
 }
 
 const documentRowToObject = (row: DocumentRow): Document => {
@@ -67,7 +120,7 @@ const documentObjectToRow = (doc: DocumentCreate) => {
     textContent: doc.textContent,
     publishedTime: doc.publishedTime,
     visibility: doc.visibility,
-    createdAt: doc.createdAt,
-    updatedAt: doc.updatedAt
+    createdAt: doc.createdAt ?? new Date(),
+    updatedAt: doc.updatedAt ?? new Date()
   }
 }

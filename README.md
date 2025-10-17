@@ -34,6 +34,18 @@ npm run dev
 
 Your application will be available at `http://localhost:5173`.
 
+### Stripe Configuration
+
+Billing requires a Stripe account and the following environment variables:
+
+- `STRIPE_SECRET_KEY`
+- `STRIPE_PRICE_ID` (the recurring price for the Pro subscription)
+- `STRIPE_WEBHOOK_SECRET`
+
+After updating the schema, run the latest Drizzle migration to create the `user_document` and `user_subscription` tables.
+
+Configure your Stripe webhook to POST to `/api/stripe-webhook`.
+
 ## Building for Production
 
 Create a production build:

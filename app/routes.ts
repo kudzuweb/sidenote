@@ -10,6 +10,8 @@ export default [
   route("api/chat/*", "routes/api.chat.ts"),
   route("api/document/*", "routes/api.document.ts"),
   route("api/upload/*", "routes/api.upload.ts"),
+  route("api/stripe-webhook", "routes/api.stripe-webhook.ts"),
+  route("api/billing/*", "routes/api.billing.ts"),
 
   route("/workspace", "routes/layout.tsx", [
     route("delete-annotation/:docId/:id", "routes/delete-annotation.ts"),

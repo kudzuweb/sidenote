@@ -10,6 +10,8 @@ import type { DocumentCreate } from "~/types/types";
 import { supabaseAdmin } from "~/server/supabase.server";
 import { chunkText, generateEmbeddings } from "~/server/document.server";
 import { extractPdfText, PdfExtractionError } from "~/server/pdf-extractor.server";
+import { ensureDocumentAllowance } from "~/server/billing.server";
+
 
 const MAX_UPLOAD_BYTES = 15 * 1024 * 1024; // 15 MB
 
@@ -17,6 +19,14 @@ const MAX_UPLOAD_BYTES = 15 * 1024 * 1024; // 15 MB
 export async function action({ request }: ActionFunctionArgs) {
     const form = await request.formData();
     const userId = await requireUser(request)
+    try {
+        await ensureDocumentAllowance(userId)
+    } catch (error) {
+        if ((error as any)?.code === "DOCUMENT_LIMIT_REACHED") {
+            throw redirect("/workspace?billing=limit")
+        }
+        throw error
+    }
 
     const file = form.get('file') as File | null;
     if (!file) throw new Response("missing file", { status: 400 });
