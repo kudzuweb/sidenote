@@ -44,23 +44,46 @@ export const getDocument = async (id: string) => {
   return document[0]
 }
 
+export const findDocumentByUrl = async (url: string): Promise<DocumentRow | null> => {
+  if (!url) return null
+  const results = await db
+    .select()
+    .from(documentTable)
+    .where(eq(documentTable.url, url))
+    .limit(1)
+  return results[0] ?? null
+}
+
+export const ensureUserDocumentLink = async (
+  userId: string,
+  documentId: string,
+  timestamps?: { createdAt?: Date; updatedAt?: Date }
+) => {
+  if (!userId || !documentId) return
+  const createdAt = timestamps?.createdAt ?? new Date()
+  const updatedAt = timestamps?.updatedAt ?? new Date()
+  await db
+    .insert(userDocumentTable)
+    .values({
+      userId,
+      documentId,
+      createdAt,
+      updatedAt,
+    })
+    .onConflictDoNothing({ target: [userDocumentTable.userId, userDocumentTable.documentId] })
+}
+
 export const saveDocument = async (document: DocumentCreate) => {
-  const dbDocument = documentObjectToRow(document)
+  const createdAt = document.createdAt ?? new Date()
+  const updatedAt = document.updatedAt ?? new Date()
+  const dbDocument = documentObjectToRow({ ...document, createdAt, updatedAt })
   await db
     .insert(documentTable)
     .values(dbDocument)
     .onConflictDoUpdate({ target: documentTable.id, set: dbDocument })
 
   if (document.userId) {
-    await db
-      .insert(userDocumentTable)
-      .values({
-        userId: document.userId,
-        documentId: document.id,
-        createdAt: document.createdAt ?? new Date(),
-        updatedAt: document.updatedAt ?? new Date(),
-      })
-      .onConflictDoNothing({ target: [userDocumentTable.userId, userDocumentTable.documentId] })
+    await ensureUserDocumentLink(document.userId, document.id, { createdAt, updatedAt })
   }
 
   return { success: true }
@@ -119,7 +142,6 @@ const documentObjectToRow = (doc: DocumentCreate) => {
     content: doc.content,
     textContent: doc.textContent,
     publishedTime: doc.publishedTime,
-    visibility: doc.visibility,
     createdAt: doc.createdAt ?? new Date(),
     updatedAt: doc.updatedAt ?? new Date()
   }

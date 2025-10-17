@@ -4,9 +4,11 @@ import { chunkText, generateEmbeddings } from "~/server/document.server"
 import { ensureDocumentAllowance } from "~/server/billing.server"
 import { extractMainFromUrl } from "~/server/content-extractor.server"
 import { crawlSite } from "~/server/crawler.server"
+import { resolveDocumentMetadata } from "~/server/document-metadata.server"
+import { attachAuthorsToDocument } from "~/server/authors.server"
+import { saveDocument, saveDocumentChunks, findDocumentByUrl, ensureUserDocumentLink }  from "../server/documents.server"
 
 export async function action({ request }: ActionFunctionArgs) {
-  const { saveDocument, saveDocumentChunks } = await import("../server/documents.server")
 
 
   const userId = await requireUser(request)
@@ -34,6 +36,7 @@ export async function action({ request }: ActionFunctionArgs) {
     throw redirect(`/workspace?message=${encodeURIComponent("Enter a valid URL before importing.")}`)
   }
   const normalizedUrl = parsedUrl.toString()
+  const existingRootDocument = await findDocumentByUrl(normalizedUrl)
 
   if (crawl) {
     const pages = await crawlSite(normalizedUrl, { maxPages, sameHostOnly: true })
@@ -45,6 +48,24 @@ export async function action({ request }: ActionFunctionArgs) {
       const createdIds: string[] = []
       for (const page of pages) {
         if (!page.textContent) continue
+        if (page.url) {
+          const existingPageDocument = await findDocumentByUrl(page.url)
+          if (existingPageDocument) {
+            await ensureUserDocumentLink(userId, existingPageDocument.id)
+            if (!createdIds.includes(existingPageDocument.id)) {
+              createdIds.push(existingPageDocument.id)
+            }
+            continue
+          }
+        }
+        const resolvedMetadata = await resolveDocumentMetadata({
+          url: page.url,
+          title: page.title ?? null,
+          byline: page.byline,
+          textContent: page.textContent,
+          publishedTime: page.publishedTime,
+          meta: page.meta,
+        })
         const chunkedDocs = await chunkText(page.textContent)
         const chunkTexts = chunkedDocs.map(d => d.pageContent)
         const embeddings = await generateEmbeddings(chunkTexts)
@@ -52,13 +73,19 @@ export async function action({ request }: ActionFunctionArgs) {
         await saveDocument({
           id: documentId,
           url: page.url,
-          title: page.title ?? "Untitled Document",
+          title: resolvedMetadata.title ?? page.title ?? "Untitled Document",
           content: page.content ?? "",
           textContent: page.textContent,
-          publishedTime: page.publishedTime ?? null,
+          publishedTime: resolvedMetadata.publishedAt ?? page.publishedTime ?? null,
+          userId,
           createdAt: new Date(),
           updatedAt: new Date(),
         })
+        await attachAuthorsToDocument(documentId, [
+          ...resolvedMetadata.authors,
+          page.byline,
+          ...page.meta.authors,
+        ])
         const documentChunks = chunkedDocs.map((doc, index) => ({
           id: crypto.randomUUID(),
           documentId,
@@ -70,10 +97,28 @@ export async function action({ request }: ActionFunctionArgs) {
         createdIds.push(documentId)
       }
       const firstId = createdIds[0]
+      if (!firstId) {
+        throw redirect(`/workspace?message=${encodeURIComponent("No new pages were imported.")}`)
+      }
       throw redirect("/workspace/document/" + firstId)
     } else {
+      if (existingRootDocument) {
+        await ensureUserDocumentLink(userId, existingRootDocument.id)
+        throw redirect("/workspace/document/" + existingRootDocument.id)
+      }
       const allText = pages.map(p => p.textContent).filter(Boolean).join("\n\n")
       if (!allText || allText.length < 1) throw redirect("/workspace")
+      const primaryPage = pages[0]
+      const resolvedMetadata = primaryPage
+        ? await resolveDocumentMetadata({
+            url: primaryPage.url,
+            title: primaryPage.title ?? null,
+            byline: primaryPage.byline,
+            textContent: allText,
+            publishedTime: primaryPage.publishedTime,
+            meta: primaryPage.meta,
+          })
+        : { authors: [], publishedAt: null, title: null }
       const chunkedDocs = await chunkText(allText)
       const chunkTexts = chunkedDocs.map(doc => doc.pageContent)
       const embeddings = await generateEmbeddings(chunkTexts)
@@ -81,13 +126,19 @@ export async function action({ request }: ActionFunctionArgs) {
       await saveDocument({
         id: documentId,
         url: normalizedUrl,
-        title: pages[0]?.title ?? "Untitled Document",
+        title: resolvedMetadata.title ?? primaryPage?.title ?? "Untitled Document",
         content: "",
         textContent: allText,
-        publishedTime: pages[0]?.publishedTime ?? null,
+        publishedTime: resolvedMetadata.publishedAt ?? primaryPage?.publishedTime ?? null,
+        userId,
         createdAt: new Date(),
         updatedAt: new Date(),
       })
+      await attachAuthorsToDocument(documentId, [
+        ...(resolvedMetadata?.authors ?? []),
+        primaryPage?.byline,
+        ...(primaryPage?.meta.authors ?? []),
+      ])
       const documentChunks = chunkedDocs.map((doc, index) => ({
         id: crypto.randomUUID(),
         documentId,
@@ -100,8 +151,22 @@ export async function action({ request }: ActionFunctionArgs) {
     }
   }
 
+  if (!crawl && existingRootDocument) {
+    await ensureUserDocumentLink(userId, existingRootDocument.id)
+    throw redirect("/workspace/document/" + existingRootDocument.id)
+  }
+
   const article = await extractMainFromUrl(normalizedUrl)
   if (!article) return
+
+  const resolvedMetadata = await resolveDocumentMetadata({
+    url: normalizedUrl,
+    title: article.title ?? null,
+    byline: article.byline,
+    textContent: article.textContent,
+    publishedTime: article.publishedTime,
+    meta: article.meta,
+  })
 
   const rawText = article.textContent
 
@@ -125,10 +190,11 @@ export async function action({ request }: ActionFunctionArgs) {
   const document = {
     id: documentId,
     url: normalizedUrl,
-    title: article.title ?? "Untitled Document",
+    title: resolvedMetadata.title ?? article.title ?? "Untitled Document",
     content: article.content ?? "",
     textContent: article.textContent,
-    publishedTime: article.publishedTime ?? null,
+    publishedTime: resolvedMetadata.publishedAt ?? article.publishedTime ?? null,
+    userId,
     createdAt: new Date(),
     updatedAt: new Date(),
   }
@@ -165,6 +231,11 @@ export async function action({ request }: ActionFunctionArgs) {
     embedding: embeddings[index],
   }))
 
+  await attachAuthorsToDocument(documentId, [
+    ...resolvedMetadata.authors,
+    article.byline,
+    ...article.meta.authors,
+  ])
   await saveDocumentChunks(documentChunks)
 
   throw redirect("/workspace/document/" + documentId)
