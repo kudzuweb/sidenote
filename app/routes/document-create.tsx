@@ -1,9 +1,9 @@
 import { redirect, type ActionFunctionArgs } from "react-router"
 import { requireUser } from "~/server/auth.server"
-import { Readability } from "@mozilla/readability"
-import { JSDOM } from "jsdom"
 import { chunkText, generateEmbeddings } from "~/server/document.server"
 import { ensureDocumentAllowance } from "~/server/billing.server"
+import { extractMainFromUrl } from "~/server/content-extractor.server"
+import { crawlSite } from "~/server/crawler.server"
 
 export async function action({ request }: ActionFunctionArgs) {
   const { saveDocument, saveDocumentChunks } = await import("../server/documents.server")
@@ -20,18 +20,88 @@ export async function action({ request }: ActionFunctionArgs) {
   }
   const formData = await request.formData()
   const url = String(formData.get("url") || "").trim()
+  const crawl = String(formData.get("crawl") || "").trim() === "on"
+  const maxPages = Number(String(formData.get("maxPages") || "").trim() || "25")
+  const splitMode = String(formData.get("splitMode") || "aggregate") as "split" | "aggregate"
   if (!url || url.length < 1) {
     throw redirect("/workspace")
   }
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(url);
+  } catch (error) {
+    console.warn("[document-create] invalid url submitted", { url, error });
+    throw redirect(`/workspace?message=${encodeURIComponent("Enter a valid URL before importing.")}`)
+  }
+  const normalizedUrl = parsedUrl.toString()
 
-  const res = await fetch(url)
-  const html = await res.text()
-  const dom = new JSDOM(html, { url })
-  const doc = dom.window.document
-  const reader = new Readability(doc)
-  const article = reader.parse();
+  if (crawl) {
+    const pages = await crawlSite(normalizedUrl, { maxPages, sameHostOnly: true })
+    if (!pages || pages.length === 0) {
+      console.warn("[action] crawl returned no pages", { url, maxPages })
+      throw redirect(`/workspace?message=${encodeURIComponent("No pages extracted. Check the URL or try fewer restrictions.")}`)
+    }
+    if (splitMode === "split") {
+      const createdIds: string[] = []
+      for (const page of pages) {
+        if (!page.textContent) continue
+        const chunkedDocs = await chunkText(page.textContent)
+        const chunkTexts = chunkedDocs.map(d => d.pageContent)
+        const embeddings = await generateEmbeddings(chunkTexts)
+        const documentId = crypto.randomUUID()
+        await saveDocument({
+          id: documentId,
+          url: page.url,
+          title: page.title ?? "Untitled Document",
+          content: page.content ?? "",
+          textContent: page.textContent,
+          publishedTime: page.publishedTime ?? null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })
+        const documentChunks = chunkedDocs.map((doc, index) => ({
+          id: crypto.randomUUID(),
+          documentId,
+          text: doc.pageContent,
+          chunkIndex: index,
+          embedding: embeddings[index],
+        }))
+        await saveDocumentChunks(documentChunks)
+        createdIds.push(documentId)
+      }
+      const firstId = createdIds[0]
+      throw redirect("/workspace/document/" + firstId)
+    } else {
+      const allText = pages.map(p => p.textContent).filter(Boolean).join("\n\n")
+      if (!allText || allText.length < 1) throw redirect("/workspace")
+      const chunkedDocs = await chunkText(allText)
+      const chunkTexts = chunkedDocs.map(doc => doc.pageContent)
+      const embeddings = await generateEmbeddings(chunkTexts)
+      const documentId = crypto.randomUUID()
+      await saveDocument({
+        id: documentId,
+        url: normalizedUrl,
+        title: pages[0]?.title ?? "Untitled Document",
+        content: "",
+        textContent: allText,
+        publishedTime: pages[0]?.publishedTime ?? null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      const documentChunks = chunkedDocs.map((doc, index) => ({
+        id: crypto.randomUUID(),
+        documentId,
+        text: doc.pageContent,
+        chunkIndex: index,
+        embedding: embeddings[index],
+      }))
+      await saveDocumentChunks(documentChunks)
+      throw redirect("/workspace/document/" + documentId)
+    }
+  }
 
-  if (!article || !article.textContent) return
+  const article = await extractMainFromUrl(normalizedUrl)
+  if (!article) return
 
   const rawText = article.textContent
 
@@ -54,12 +124,13 @@ export async function action({ request }: ActionFunctionArgs) {
   const documentId = crypto.randomUUID()
   const document = {
     id: documentId,
-    userId: userId,
-    url: url,
+    url: normalizedUrl,
     title: article.title ?? "Untitled Document",
     content: article.content ?? "",
     textContent: article.textContent,
     publishedTime: article.publishedTime ?? null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
   }
   await saveDocument(document)
 

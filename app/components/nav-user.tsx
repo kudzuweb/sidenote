@@ -29,8 +29,8 @@ export function NavUser({
   setTheme,
   theme,
 }: {
-  setTheme: React.Dispatch<React.SetStateAction<string>>;
-  theme: string;
+  setTheme: React.Dispatch<React.SetStateAction<"light" | "dark" >>;
+  theme: "light" | "dark";
   user: {
     name: string;
     email: string;

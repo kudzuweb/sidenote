@@ -2,7 +2,7 @@
 
 import { ArrowLeft, CreditCard, FilePlus2, Library, Loader2, Search, SearchX, Sparkles, UserPlus, Users } from "lucide-react";
 import { useEffect, useState, type ComponentProps } from "react";
-import { Form, useFetcher, useRevalidator } from "react-router";
+import { Form, useFetcher, useRevalidator, useLocation } from "react-router";
 import { NavUser } from "~/components/nav-user";
 import { Button } from "~/components/ui/button";
 import {
@@ -32,8 +32,8 @@ import Logo from "./logo";
 
 type UIMessagePart = { type: string; text?: string }
 type UIMessage = { role: string; parts: UIMessagePart[] }
-type UserInfo = { name: string; email: string; avatar: string }
-type SidebarAppProps = { setTheme: React.Dispatch<React.SetStateAction<string>>; theme: string; data: any; user: UserInfo; side: "left" | "right" } & ComponentProps<typeof Sidebar>
+type UserInfo = { name: string; email: string; avatar: string; fallback: string }
+type SidebarAppProps = { setTheme: React.Dispatch<React.SetStateAction<"light" | "dark" >>; theme: "light" | "dark"; data: any; user: UserInfo; side: "left" | "right" } & ComponentProps<typeof Sidebar>
 
 export function SidebarApp({ side, setTheme, theme, data, user, ...props }: SidebarAppProps) {
   const [mode, setMode] = useState("document")
@@ -45,13 +45,14 @@ export function SidebarApp({ side, setTheme, theme, data, user, ...props }: Side
   const [isModalOpen, setIsModalOpen] = useState(false);
   const fetcher = useFetcher();
   const revalidator = useRevalidator();
+  const location = useLocation();
   const [editingGroup, setEditingGroup] = useState(null);
   const [groups, setGroups] = useState(data.groups)
   const [documents, setDocuments] = useState(data.documents)
   const [billingError, setBillingError] = useState<string | null>(null);
   const [billingLoading, setBillingLoading] = useState(false);
 
-  const handleEditGroup = (group) => {
+  const handleEditGroup = (group: any) => {
     setEditingGroup(group);
     setIsModalOpen(true);
   }
@@ -81,7 +82,7 @@ export function SidebarApp({ side, setTheme, theme, data, user, ...props }: Side
     }
   }, [fetcher.data, fetcher.state]);
 
-  const handleSearchSubmit = (event) => {
+  const handleSearchSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     const form = event.currentTarget as HTMLFormElement
     const input = form.querySelector('input[name="query"]') as HTMLInputElement
     const value = input?.value || "";
@@ -92,16 +93,16 @@ export function SidebarApp({ side, setTheme, theme, data, user, ...props }: Side
     }
   }
 
-  const handleUrlInput = (event) => {
-    setUrl(event.target.value)
+  const handleUrlInput = (event: React.FormEvent<HTMLInputElement>) => {
+    setUrl(event.currentTarget.value)
   }
 
-  const handleNewDocSubmit = (event) => {
+  const handleNewDocSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    // event.preventDefault()
     if (documentLimitReached) {
       event.preventDefault()
       return
     }
-
     const form = event.currentTarget as HTMLFormElement
 
     const input = form.querySelector('input[name="url"]') as HTMLInputElement
@@ -154,6 +155,11 @@ export function SidebarApp({ side, setTheme, theme, data, user, ...props }: Side
     <Sidebar className="border-r-0" {...props} side="left">
       <SidebarHeader>
         <Logo theme={theme} />
+        {new URLSearchParams(location.search).get("message") && (
+          <div className="mt-2 text-xs p-2 rounded bg-amber-100 text-amber-900">
+            {new URLSearchParams(location.search).get("message")}
+          </div>
+        )}
         <Tabs defaultValue="tab-1" className="items-center">
           <div className="flex w-full items-center justify-between">
             <Button size="icon" variant="ghost" onClick={() => {
@@ -272,27 +278,32 @@ export function SidebarApp({ side, setTheme, theme, data, user, ...props }: Side
           </div>
         </fetcher.Form>
         <Form method="post" action="document-create" onSubmit={handleNewDocSubmit} autoComplete="off">
-          <div className="flex items-center justify-between">
-            <input
-              className="text-xs py-2 pl-4 pr-2 disabled:cursor-not-allowed disabled:opacity-50"
-              type="text"
-              name="url"
-              value={url}
-              onInput={handleUrlInput}
-              placeholder="Add Read by URL"
-              disabled={documentLimitReached}
-            />
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button size="icon" variant="ghost" type="submit" disabled={documentLimitReached}>
-                  <FilePlus2 className="h-5 w-5" />
-                  <span className="sr-only">Add Read</span>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Add Read</p>
-              </TooltipContent>
-            </Tooltip>
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <input className="text-xs py-2 pl-4 pr-2" type="text" name="url" value={url} onInput={handleUrlInput} disabled={documentLimitReached} placeholder="Add Read by URL" />
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button size="icon" variant="ghost" type="submit" disabled={documentLimitReached}>
+                    <FilePlus2 className="h-5 w-5" />
+                    <span className="sr-only">Add Read</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Add Read</p>
+                </TooltipContent>
+              </Tooltip>
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <label className="flex items-center gap-2 text-xs">
+                <input type="checkbox" name="crawl" />
+                Crawl site
+              </label>
+              <input className="text-xs py-1 px-2 w-20" type="number" name="maxPages" min={1} max={200} placeholder="25" />
+              <select name="splitMode" className="text-xs py-1 px-2">
+                <option value="aggregate">One document</option>
+                <option value="split">One per page</option>
+              </select>
+            </div>
           </div>
         </Form>
         <UploadForm disabled={documentLimitReached} />
