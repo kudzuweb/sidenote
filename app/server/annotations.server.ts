@@ -1,5 +1,5 @@
 import { and, eq, inArray } from "drizzle-orm";
-import { annotation, groupDocumentTable, groupMemberTable, groupTable, userDocumentTable } from "~/db/schema";
+import { annotation, groupDocumentTable, groupMemberTable, groupTable, permissionTable, userDocumentTable } from "~/db/schema";
 import { db } from "~/server/index.server";
 import type { Annotation, AnnotationCreate, AnnotationRow } from "~/types/types";
 import { NotFoundError } from "./errors.server";
@@ -42,11 +42,32 @@ export const getAnnotations = async (userId: string, documentId: string) => {
     .from(groupDocumentTable)
     .where(eq(groupDocumentTable.documentId, documentId));
 
-  const documentGroupIds = documentGroups.map((g) => g.groupId);
+  const documentGroupIds = new Set(documentGroups.map((g) => g.groupId));
 
-  // intersection of user & doc gorups
+  const documentPermissions = await db
+    .select({
+      principalType: permissionTable.principalType,
+      principalId: permissionTable.principalId,
+    })
+    .from(permissionTable)
+    .where(
+      and(
+        eq(permissionTable.resourceType, "document" as any),
+        eq(permissionTable.resourceId, documentId)
+      )
+    );
+
+  const permissionGroupIds = documentPermissions
+    .filter((perm) => perm.principalType === "group")
+    .map((perm) => perm.principalId);
+
+  for (const groupId of permissionGroupIds) {
+    documentGroupIds.add(groupId);
+  }
+
+  // intersection of user's groups & document-linked groups
   const sharedGroupIds = userGroupIds.filter((id) =>
-    documentGroupIds.includes(id)
+    documentGroupIds.has(id)
   );
 
   // all members of user's groups
@@ -66,24 +87,28 @@ export const getAnnotations = async (userId: string, documentId: string) => {
         .where(inArray(groupTable.id, sharedGroupIds))
       : [];
 
-  const documentOwnerUserIds = await db
-    .select({ ownerId: userDocumentTable.userId })
+  const documentUserLinks = await db
+    .select({ userId: userDocumentTable.userId })
     .from(userDocumentTable)
-    .where(
-      and(
-        eq(userDocumentTable.documentId, documentId),
-        eq(userDocumentTable.role, "owner" as any)
-      )
-    );
+    .where(eq(userDocumentTable.documentId, documentId));
 
-  const memberIds = [
-    ...new Set([
-      ...groupMemberUserIds.map((m) => m.userId),
-      ...groupOwnerUserIds.map((g) => g.ownerId),
-      ...documentOwnerUserIds.map((o) => o.ownerId),
-      userId,
-    ]),
+  const permissionUserIds = [
+    ...new Set(
+      documentPermissions
+        .filter((perm) => perm.principalType === "user")
+        .map((perm) => perm.principalId)
+    ),
   ];
+
+  const collaboratorIdsSet = new Set<string>([
+    userId,
+    ...permissionUserIds,
+    ...documentUserLinks.map((entry) => entry.userId),
+    ...groupMemberUserIds.map((m) => m.userId),
+    ...groupOwnerUserIds.map((g) => g.ownerId),
+  ]);
+
+  const collaboratorIds = [...collaboratorIdsSet];
 
   const annotations = await db
     .select()
@@ -97,7 +122,7 @@ export const getAnnotations = async (userId: string, documentId: string) => {
     if (anno.visibility === "private") return false
 
     // group member annos
-    if (memberIds.includes(anno.userId)) return true
+    if (collaboratorIds.includes(anno.userId)) return true
 
     // public annos
     if (anno.visibility === "public") return true
