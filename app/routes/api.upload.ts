@@ -5,11 +5,20 @@ import { join } from "path";
 import { redirect, type ActionFunctionArgs } from "react-router";
 import { requireUser } from "~/server/auth.server";
 import { saveDocument } from "~/server/documents.server";
+import { ensureDocumentAllowance } from "~/server/billing.server";
 
 
 export async function action({ request }: ActionFunctionArgs) {
     const form = await request.formData();
     const userId = await requireUser(request)
+    try {
+        await ensureDocumentAllowance(userId)
+    } catch (error) {
+        if ((error as any)?.code === "DOCUMENT_LIMIT_REACHED") {
+            throw redirect("/workspace?billing=limit")
+        }
+        throw error
+    }
 
     const file = form.get('file') as File | null;
     if (!file) throw new Response("missing file", { status: 400 });

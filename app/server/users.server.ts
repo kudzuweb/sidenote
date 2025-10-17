@@ -1,8 +1,7 @@
 import { eq } from "drizzle-orm";
 import { user } from "~/db/schema";
 import { db } from "~/server/index.server";
-import type { UserRow } from "~/types/types";
-import type { GroupMember, UserBasic } from "~/types/types";
+import type { GroupMember, UserBasic, UserRow } from "~/types/types";
 
 export const getAllUsers = async (): Promise<UserBasic[]> => {
   const results = await db.select().from(user);
@@ -31,4 +30,9 @@ export const userRowToGroupMember = (row: UserRow, isOwner: boolean = false): Gr
     image: row.image,
     isOwner,
   };
+};
+
+export const getUserById = async (id: string): Promise<UserRow | null> => {
+  const result = await db.select().from(user).where(eq(user.id, id));
+  return result.length > 0 ? result[0] : null;
 };

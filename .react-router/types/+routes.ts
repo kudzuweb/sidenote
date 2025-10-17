@@ -49,6 +49,14 @@ type Pages = {
       "*": string;
     };
   };
+  "/api/stripe-webhook": {
+    params: {};
+  };
+  "/api/billing/*": {
+    params: {
+      "*": string;
+    };
+  };
   "/workspace": {
     params: {};
   };
@@ -90,7 +98,7 @@ type Pages = {
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/signin" | "/signup" | "/api/auth/*" | "/api/permissions/*" | "/api/groups/*" | "/api/chat/*" | "/api/document/*" | "/api/upload/*" | "/workspace" | "/workspace/delete-annotation/:docId/:id" | "/workspace/document-search" | "/workspace/document/:id" | "/workspace/document/:id/chat/:chatId" | "/workspace/document/:id/chat-create" | "/workspace/document/:id/save-annotation" | "/workspace/document-create";
+    page: "/" | "/signin" | "/signup" | "/api/auth/*" | "/api/permissions/*" | "/api/groups/*" | "/api/chat/*" | "/api/document/*" | "/api/upload/*" | "/api/stripe-webhook" | "/api/billing/*" | "/workspace" | "/workspace/delete-annotation/:docId/:id" | "/workspace/document-search" | "/workspace/document/:id" | "/workspace/document/:id/chat/:chatId" | "/workspace/document/:id/chat-create" | "/workspace/document/:id/save-annotation" | "/workspace/document-create";
   };
   "routes/home.tsx": {
     id: "routes/home";
@@ -127,6 +135,14 @@ type RouteFiles = {
   "routes/api.upload.ts": {
     id: "routes/api.upload";
     page: "/api/upload/*";
+  };
+  "routes/api.stripe-webhook.ts": {
+    id: "routes/api.stripe-webhook";
+    page: "/api/stripe-webhook";
+  };
+  "routes/api.billing.ts": {
+    id: "routes/api.billing";
+    page: "/api/billing/*";
   };
   "routes/layout.tsx": {
     id: "routes/layout";

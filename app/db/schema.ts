@@ -4,6 +4,8 @@ export const visibilityEnum = pgEnum("visibility", ["private", "public"]);
 export const resourceEnum = pgEnum("resource", ["document", "annotation", "comment", "chat", "group"]);
 export const principalEnum = pgEnum("principal", ["user", "group"]);
 export const permissionLevelEnum = pgEnum("permission_level", ["read", "write", "admin"]);
+export const planEnum = pgEnum("plan", ["free", "pro"]);
+export const subscriptionStatusEnum = pgEnum("subscription_status", ["inactive", "trialing", "active", "past_due", "canceled"]);
 
 export const chatTable = pgTable("chat", {
   id: text("id").primaryKey(),
@@ -222,6 +224,39 @@ export const groupDocumentTable = pgTable("group_document", {
 }, (table) => [
   primaryKey({ columns: [table.groupId, table.documentId] }),]
 )
+
+export const userDocumentTable = pgTable("user_document", {
+  userId: text("user_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+  documentId: text("document_id")
+    .notNull()
+    .references(() => documentTable.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at")
+    .defaultNow()
+    .$onUpdate(() => /* @__PURE__ */ new Date())
+    .notNull(),
+}, (table) => [
+  primaryKey({ columns: [table.userId, table.documentId] }),
+])
+
+export const userSubscriptionTable = pgTable("user_subscription", {
+  userId: text("user_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" })
+    .primaryKey(),
+  stripeCustomerId: text("stripe_customer_id"),
+  stripeSubscriptionId: text("stripe_subscription_id"),
+  plan: planEnum("plan").notNull().default("free"),
+  status: subscriptionStatusEnum("status").notNull().default("inactive"),
+  currentPeriodEnd: timestamp("current_period_end"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at")
+    .defaultNow()
+    .$onUpdate(() => /* @__PURE__ */ new Date())
+    .notNull(),
+})
 
 export const verification = pgTable("verification", {
   id: text("id").primaryKey(),

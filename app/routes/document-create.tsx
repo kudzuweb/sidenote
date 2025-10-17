@@ -3,12 +3,21 @@ import { requireUser } from "~/server/auth.server"
 import { Readability } from "@mozilla/readability"
 import { JSDOM } from "jsdom"
 import { chunkText, generateEmbeddings } from "~/server/document.server"
+import { ensureDocumentAllowance } from "~/server/billing.server"
 
 export async function action({ request }: ActionFunctionArgs) {
   const { saveDocument, saveDocumentChunks } = await import("../server/documents.server")
 
 
   const userId = await requireUser(request)
+  try {
+    await ensureDocumentAllowance(userId)
+  } catch (error) {
+    if ((error as any)?.code === "DOCUMENT_LIMIT_REACHED") {
+      throw redirect("/workspace?billing=limit")
+    }
+    throw error
+  }
   const formData = await request.formData()
   const url = String(formData.get("url") || "").trim()
   if (!url || url.length < 1) {
