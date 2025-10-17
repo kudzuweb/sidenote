@@ -29,7 +29,7 @@ const {
   createTrigger,
 } = createSidebarComponents({
   cookieName: "sidebar_state_left",
-  width: "15rem",
+  width: "16rem",
   widthMobile: "18rem",
   widthIcon: "3rem",
   keyboardShortcut: "b",

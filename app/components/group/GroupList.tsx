@@ -20,21 +20,21 @@ const GroupList = (props: { groups, onEditGroup }) => {
           return (
             <Tooltip>
               <TooltipTrigger asChild>
-                <AccordionItem value={group.id} key={group.id} className="">
-                  <AccordionTrigger className="">
-                    <SidebarMenuButton className="w-full text-xs flex items-start gap-2 h-auto px-2 py-2">
-                      <div className="flex flex-col w-full gap-2">
+                <AccordionItem value={group.id} key={group.id} className="w-full">
+                  <AccordionTrigger className="w-full">
+                    <SidebarMenuButton className="flex w-full items-start gap-2 px-2 py-2 text-xs">
+                      <div className="flex w-full min-w-0 flex-col gap-2">
                         <div className="flex-1 overflow-hidden">
                           <span className="line-clamp-2 leading-snug break-words text-left overflow-hidden text-ellipsis whitespace-normal">
                             {name}
                           </span>
                         </div>
-                        <div className="flex flex-row justify-between w-full items-center">
+                        <div className="flex w-full flex-row items-center justify-between">
                           <GroupAvatarStack users={group?.members} />
                           <Button
                             size="icon"
                             variant="ghost"
-                            className="h-5 w-5 p-0 shrink-0 mt-[2px]"
+                            className="mt-[2px] flex h-5 w-5 shrink-0 p-0"
                             onClick={(e) => {
                               e.stopPropagation();
                               props.onEditGroup({
@@ -51,7 +51,7 @@ const GroupList = (props: { groups, onEditGroup }) => {
                       </div>
                     </SidebarMenuButton>
                   </AccordionTrigger>
-                  <AccordionContent className="pb-2">
+                  <AccordionContent className="w-full pb-2">
                     <DocumentList documents={group.documents} />
                   </AccordionContent>
                 </AccordionItem>

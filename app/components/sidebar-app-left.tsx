@@ -33,7 +33,8 @@ import DocumentList from "./document/DocumentList";
 import GroupList from "./group/GroupList";
 import { GroupModal } from "./group/GroupModal";
 import SearchResultList from "./SearchResultList";
-import { Accordion } from "./ui/accordion";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "./ui/accordion";
+import { ScrollArea } from "./ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import UploadForm from "./upload-form";
 import Logo from "./logo";
@@ -111,6 +112,24 @@ export function SidebarApp({ side, setTheme, theme, data, user, ...props }: Side
     }
     if (input) input.value = value.trim()
   }
+
+  const hasSearchResults = searchResults.length > 0
+  const isGroupMode = mode === "group"
+  const sidebarListLabel = hasSearchResults
+    ? "Signal Scan"
+    : isGroupMode
+      ? "Collective Nodes"
+      : "Recent Transmission"
+
+  const sidebarListBody = hasSearchResults ? (
+    <SearchResultList results={searchResults} />
+  ) : isGroupMode ? (
+    <Accordion type="single" collapsible className="w-full">
+      <GroupList groups={groups} onEditGroup={handleEditGroup} />
+    </Accordion>
+  ) : (
+    <DocumentList documents={documents} />
+  )
 
   return (
     <Sidebar className="border-r-0" {...props} side="left">
@@ -217,158 +236,157 @@ export function SidebarApp({ side, setTheme, theme, data, user, ...props }: Side
           </TabsContent>
         </Tabs>
       </SidebarHeader>
-      <SidebarContent>
-        <fetcher.Form
-          method="get"
-          action="/workspace/document-search"
-          className="space-y-3"
-          onSubmit={handleSearchSubmit}
-        >
-          <div className={cn(secondaryPanelClasses, "flex items-center gap-3")}>
-            <input
-              className={cn(inputShellClasses, "w-full flex-1")}
-              type="text"
-              name="query"
-              placeholder="Search Signal"
-              value={query}
-              onChange={(e) => {
-                setQuery(e.target.value)
-              }}
-            />
-            {searchResults.length > 0 ? (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className={cn(iconButtonClasses, "shrink-0")}
-                    onClick={() => {
-                      setSearchResults([])
-                      setMode("group")
-                      setQuery("")
-                    }}
-                  >
-                    <SearchX className="h-5 w-5" />
-                    <span className="sr-only">Clear Search</span>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Clear Search</p>
-                </TooltipContent>
-              </Tooltip>
-            ) : (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    type="submit"
-                    className={cn(iconButtonClasses, "shrink-0")}
-                  >
-                    <Search className="h-5 w-5" />
-                    <span className="sr-only">Search</span>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Search</p>
-                </TooltipContent>
-              </Tooltip>
-            )}
-          </div>
-        </fetcher.Form>
-        <Form
-          method="post"
-          action="document-create"
-          onSubmit={handleNewDocSubmit}
-          autoComplete="off"
-          className="space-y-3"
-        >
-          <div className={cn(secondaryPanelClasses, "flex flex-col gap-3")}>
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              <input
-                className={cn(inputShellClasses, "flex-1")}
-                type="text"
-                name="url"
-                value={url}
-                onInput={handleUrlInput}
-                placeholder="Beam in via URL"
-              />
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    type="submit"
-                    className={cn(iconButtonClasses, "shrink-0")}
-                  >
-                    <FilePlus2 className="h-5 w-5" />
-                    <span className="sr-only">Add Read</span>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Add Read</p>
-                </TooltipContent>
-              </Tooltip>
-            </div>
-            <div className="flex flex-wrap items-center justify-between gap-3 text-[#8ffcff]/70">
-              <label className="flex items-center gap-2 font-mono text-[0.65rem] tracking-[0.12em] uppercase">
+      <SidebarContent className="flex-1">
+        <div className="flex h-full flex-col gap-4 px-3 py-4">
+          <div className="space-y-3">
+            <fetcher.Form
+              method="get"
+              action="/workspace/document-search"
+              className="space-y-3"
+              onSubmit={handleSearchSubmit}
+            >
+              <div className={cn(secondaryPanelClasses, "flex w-full items-center gap-2")}>
                 <input
-                  type="checkbox"
-                  name="crawl"
-                  className="size-4 rounded border border-[#343065]/70 bg-[#050711]/90 accent-[#ff5688] focus:outline-none focus:ring-2 focus:ring-[#6efff4]/30"
+                  className={cn(inputShellClasses, "flex-1 min-w-0")}
+                  type="text"
+                  name="query"
+                  placeholder="Search Signal"
+                  value={query}
+                  onChange={(e) => {
+                    setQuery(e.target.value)
+                  }}
                 />
-                Crawl site
-              </label>
-              <input
-                className={cn(inputShellClasses, "w-24 text-center")}
-                type="number"
-                name="maxPages"
-                min={1}
-                max={200}
-                placeholder="25"
-              />
-              <select
-                name="splitMode"
-                className={cn(inputShellClasses, "w-48 bg-[#050711]/90 text-xs")}
-              >
-                <option value="aggregate">One document</option>
-                <option value="split">One per page</option>
-              </select>
-            </div>
+                {hasSearchResults ? (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className={cn(iconButtonClasses, "shrink-0")}
+                        onClick={() => {
+                          setSearchResults([])
+                          setMode("group")
+                          setQuery("")
+                        }}
+                      >
+                        <SearchX className="h-5 w-5" />
+                        <span className="sr-only">Clear Search</span>
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Clear Search</p>
+                    </TooltipContent>
+                  </Tooltip>
+                ) : (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        type="submit"
+                        className={cn(iconButtonClasses, "shrink-0")}
+                      >
+                        <Search className="h-5 w-5" />
+                        <span className="sr-only">Search</span>
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Search</p>
+                    </TooltipContent>
+                  </Tooltip>
+                )}
+              </div>
+            </fetcher.Form>
+            <Accordion type="single" collapsible className="w-full">
+              <AccordionItem value="document-intake" className="w-full">
+                <AccordionTrigger className="w-full rounded-xl border border-[#26224a]/70 bg-[#0b0618]/80 px-3 py-2 text-[0.7rem] font-mono uppercase tracking-[0.18em] text-[#8ffcff]/80 hover:text-white">
+                  <span className="flex items-center gap-2">
+                    <FilePlus2 className="h-4 w-4 shrink-0 text-[#71fff6]" />
+                    Document Intake
+                  </span>
+                </AccordionTrigger>
+                <AccordionContent className="space-y-3">
+                  <Form
+                    method="post"
+                    action="document-create"
+                    onSubmit={handleNewDocSubmit}
+                    autoComplete="off"
+                    className="space-y-3"
+                  >
+                    <div className={cn(secondaryPanelClasses, "grid w-full gap-3")}>
+                      <div className="flex items-center gap-2">
+                        <input
+                          className={cn(inputShellClasses, "flex-1 min-w-0")}
+                          type="text"
+                          name="url"
+                          value={url}
+                          onInput={handleUrlInput}
+                          placeholder="Beam in via URL"
+                        />
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              type="submit"
+                              className={cn(iconButtonClasses, "shrink-0")}
+                            >
+                              <FilePlus2 className="h-5 w-5" />
+                              <span className="sr-only">Add Read</span>
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Add Read</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                      <div className="grid gap-2 text-[#8ffcff]/70">
+                        <label className="flex items-center gap-2 font-mono text-[0.65rem] uppercase tracking-[0.12em]">
+                          <input
+                            type="checkbox"
+                            name="crawl"
+                            className="size-4 rounded border border-[#343065]/70 bg-[#050711]/90 accent-[#ff5688] focus:outline-none focus:ring-2 focus:ring-[#6efff4]/30"
+                          />
+                          Crawl site
+                        </label>
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          <input
+                            className={cn(inputShellClasses, "w-full text-center")}
+                            type="number"
+                            name="maxPages"
+                            min={1}
+                            max={200}
+                            placeholder="25"
+                          />
+                          <select
+                            name="splitMode"
+                            className={cn(inputShellClasses, "w-full bg-[#050711]/90 text-xs")}
+                          >
+                            <option value="aggregate">One document</option>
+                            <option value="split">One per page</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                  </Form>
+                  <div className="w-full">
+                    <UploadForm />
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
           </div>
-        </Form>
-        <UploadForm />
-        <SidebarSeparator />
-      </SidebarContent>
-      <SidebarContent>
-        <div className="flex flex-col gap-4">
-          <SidebarGroup>
-            {searchResults.length > 0 ?
-              <>
-                <SidebarGroupLabel>Signal Scan</SidebarGroupLabel>
-                <SidebarMenu>
-                  <SearchResultList results={searchResults} />
+          <SidebarSeparator />
+          <div className="flex-1">
+            <SidebarGroup className="flex h-full flex-col">
+              <SidebarGroupLabel>{sidebarListLabel}</SidebarGroupLabel>
+              <ScrollArea className="mt-2 flex-1 pr-1">
+                <SidebarMenu className="w-full">
+                  {sidebarListBody}
                 </SidebarMenu>
-              </>
-              :
-              mode === "document" ?
-                <>
-                  <SidebarGroupLabel>Recent Transmission</SidebarGroupLabel>
-                  <SidebarMenu>
-                    <DocumentList documents={documents} />
-                  </SidebarMenu>
-                </>
-                : mode === "group" &&
-                <>
-                  <SidebarGroupLabel>Collective Nodes</SidebarGroupLabel>
-                  <SidebarMenu>
-                    <Accordion type="single" collapsible className="w-full" defaultValue="3">
-                      <GroupList groups={groups} onEditGroup={handleEditGroup} />
-                    </Accordion>
-                  </SidebarMenu>
-                </>
-            }
-          </SidebarGroup>
+              </ScrollArea>
+            </SidebarGroup>
+          </div>
         </div>
       </SidebarContent>
       <SidebarRail />
