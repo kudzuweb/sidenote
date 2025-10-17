@@ -6,7 +6,9 @@ import type {
   documentTable,
   groupTable,
   permissionTable,
-  user
+  user,
+  userDocumentTable,
+  userSubscriptionTable
 } from "~/db/schema";
 
 export type Visibility = "private" | "public"
@@ -24,6 +26,8 @@ export type ChatRow = typeof chatTable.$inferSelect;
 export type GroupRow = typeof groupTable.$inferSelect;
 export type PermissionRow = typeof permissionTable.$inferSelect;
 export type AuthorRow = typeof authorTable.$inferSelect;
+export type UserDocumentRow = typeof userDocumentTable.$inferSelect;
+export type UserSubscriptionRow = typeof userSubscriptionTable.$inferSelect;
 
 export type User = {
   id: string;
@@ -53,6 +57,7 @@ export type Document = {
   publishedTime: string | null;
   createdAt: Date;
   updatedAt: Date;
+  userId?: string;
 }
 
 export type DocumentCreate = {
@@ -63,8 +68,9 @@ export type DocumentCreate = {
   textContent: string | null;
   publishedTime: string | null;
   visibility?: Visibility;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt?: Date;
+  updatedAt?: Date;
+  userId?: string;
 }
 
 export type DocumentBasic = {
@@ -199,6 +205,9 @@ export type GroupWithDetails = Group & {
   members: GroupMember[];
   documents: DocumentBasic[];
 }
+
+export type SubscriptionPlan = "free" | "pro";
+export type SubscriptionStatus = "inactive" | "trialing" | "active" | "past_due" | "canceled";
 
 export type GroupMember = UserBasic & {
   isOwner?: boolean;

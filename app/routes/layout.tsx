@@ -23,6 +23,7 @@ import { getSession, getUser } from "~/server/auth.server";
 import { getDocumentAuthors } from "~/server/authors.server";
 import { getChats } from "~/server/chats.server";
 import { getDocument, getDocuments } from "~/server/documents.server";
+import { getDocumentLimitInfo } from "~/server/billing.server";
 import { getGroups } from "~/server/groups.server";
 import type { Route } from "./+types/layout";
 
@@ -35,6 +36,7 @@ export const loader = async ({ request, params }: Route.LoaderArgs) => {
   const chats = userId && docId ? await getChats(userId, docId) : [];
   const documents = await getDocuments(userId);
   const groups = await getGroups(userId);
+  const documentLimit = userId ? await getDocumentLimitInfo(userId) : null;
 
   const waitForDocument = async () => {
     if (params?.id) {
@@ -58,7 +60,7 @@ export const loader = async ({ request, params }: Route.LoaderArgs) => {
   const authors = await waitForDocAuthors();
   const annotations = await waitForAnnotations();
 
-  return { user, chats, groups, documents, document, authors, annotations };
+  return { user, chats, groups, documents, documentLimit, document, authors, annotations };
 };
 
 const Layout = ({ loaderData }: Route.ComponentProps) => {

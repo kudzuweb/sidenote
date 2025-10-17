@@ -99,6 +99,13 @@
       "when": 1759964836713,
       "tag": "0014_small_expediter",
       "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1760000000000,
+      "tag": "0015_stripe_subscription",
+      "breakpoints": true
     }
   ]
 }

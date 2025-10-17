@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, FilePlus2, Library, Search, SearchX, UserPlus, Users } from "lucide-react";
+import { ArrowLeft, CreditCard, FilePlus2, Library, Loader2, Search, SearchX, Sparkles, UserPlus, Users } from "lucide-react";
 import { useEffect, useState, type ComponentProps } from "react";
 import { Form, useFetcher, useRevalidator, useLocation } from "react-router";
 import { NavUser } from "~/components/nav-user";
@@ -49,6 +49,8 @@ export function SidebarApp({ side, setTheme, theme, data, user, ...props }: Side
   const [editingGroup, setEditingGroup] = useState(null);
   const [groups, setGroups] = useState(data.groups)
   const [documents, setDocuments] = useState(data.documents)
+  const [billingError, setBillingError] = useState<string | null>(null);
+  const [billingLoading, setBillingLoading] = useState(false);
 
   const handleEditGroup = (group: any) => {
     setEditingGroup(group);
@@ -63,9 +65,12 @@ export function SidebarApp({ side, setTheme, theme, data, user, ...props }: Side
     if (data?.document) setDocumentId(data.document.id)
     if (data?.documents) setDocuments(data.documents)
     if (data?.groups) setGroups(data.groups)
-    console.log(data)
   }, [data])
-  
+
+  const limitInfo = data?.documentLimit;
+  const documentLimitReached = limitInfo ? !limitInfo.allowed : false;
+  const documentsRemaining = limitInfo?.remaining === Infinity ? null : limitInfo?.remaining;
+  const isSubscribed = limitInfo?.subscribed ?? false;
 
   useEffect(() => {
     if (fetcher.data && fetcher.data.length > 0) {
@@ -94,6 +99,10 @@ export function SidebarApp({ side, setTheme, theme, data, user, ...props }: Side
 
   const handleNewDocSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     // event.preventDefault()
+    if (documentLimitReached) {
+      event.preventDefault()
+      return
+    }
     const form = event.currentTarget as HTMLFormElement
 
     const input = form.querySelector('input[name="url"]') as HTMLInputElement
@@ -104,6 +113,43 @@ export function SidebarApp({ side, setTheme, theme, data, user, ...props }: Side
     }
     if (input) input.value = value.trim()
   }
+
+  const startBillingRequest = async (intent: "checkout" | "portal") => {
+    setBillingError(null)
+    setBillingLoading(true)
+    try {
+      const response = await fetch("/api/billing", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ intent }),
+      })
+      const payload = await response.json()
+
+      if (!response.ok) {
+        throw new Error(payload?.error || "Unable to start billing")
+      }
+
+      if (payload.alreadySubscribed) {
+        setBillingError("Your subscription is already active.")
+        return
+      }
+
+      if (payload?.url) {
+        window.location.href = payload.url
+        return
+      }
+
+      throw new Error("Billing response missing redirect URL.")
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Billing request failed"
+      setBillingError(message)
+    } finally {
+      setBillingLoading(false)
+    }
+  }
+
+  const handleUpgrade = () => startBillingRequest("checkout")
+  const handleManageBilling = () => startBillingRequest("portal")
 
   return (
     <Sidebar className="border-r-0" {...props} side="left">
@@ -234,10 +280,10 @@ export function SidebarApp({ side, setTheme, theme, data, user, ...props }: Side
         <Form method="post" action="document-create" onSubmit={handleNewDocSubmit} autoComplete="off">
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
-              <input className="text-xs py-2 pl-4 pr-2" type="text" name="url" value={url} onInput={handleUrlInput} placeholder="Add Read by URL" />
+              <input className="text-xs py-2 pl-4 pr-2" type="text" name="url" value={url} onInput={handleUrlInput} disabled={documentLimitReached} placeholder="Add Read by URL" />
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button size="icon" variant="ghost" type="submit">
+                  <Button size="icon" variant="ghost" type="submit" disabled={documentLimitReached}>
                     <FilePlus2 className="h-5 w-5" />
                     <span className="sr-only">Add Read</span>
                   </Button>
@@ -260,7 +306,74 @@ export function SidebarApp({ side, setTheme, theme, data, user, ...props }: Side
             </div>
           </div>
         </Form>
-        <UploadForm />
+        <UploadForm disabled={documentLimitReached} />
+        {limitInfo && (
+          <div className="space-y-2 rounded-md border border-dashed border-muted-foreground/40 bg-muted/30 px-3 py-2 text-xs">
+            {!isSubscribed ? (
+              <>
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-muted-foreground" />
+                  <p className="font-semibold text-muted-foreground">
+                    {documentLimitReached
+                      ? `Free plan limit reached (${limitInfo.limit} documents).`
+                      : `Free plan: ${documentsRemaining ?? limitInfo.limit
+                      } document${documentsRemaining === 1 ? "" : "s"} remaining.`}
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    size="sm"
+                    type="button"
+                    onClick={handleUpgrade}
+                    disabled={billingLoading}
+                  >
+                    {billingLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Redirecting…
+                      </>
+                    ) : (
+                      <>
+                        <CreditCard className="mr-2 h-4 w-4" />
+                        Upgrade to Pro
+                      </>
+                    )}
+                  </Button>
+                  <p className="text-muted-foreground">
+                    Unlimited documents plus priority support.
+                  </p>
+                </div>
+              </>
+            ) : (
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-muted-foreground" />
+                  <p className="font-semibold text-muted-foreground">Pro plan active</p>
+                </div>
+                <Button
+                  size="sm"
+                  type="button"
+                  variant="outline"
+                  onClick={handleManageBilling}
+                  disabled={billingLoading}
+                >
+                  {billingLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Opening portal…
+                    </>
+                  ) : (
+                    <>
+                      <CreditCard className="mr-2 h-4 w-4" />
+                      Manage Billing
+                    </>
+                  )}
+                </Button>
+              </div>
+            )}
+            {billingError && <p className="text-destructive">{billingError}</p>}
+          </div>
+        )}
         <SidebarSeparator />
       </SidebarContent>
       <SidebarContent>
