@@ -1,6 +1,6 @@
-# Fractal Chat
+# Sidenote
 
-**Fractal Chat** is an AI-powered reader application that enables users to interact with their documents (PDFs, EPUBs) using advanced RAG (Retrieval-Augmented Generation) techniques. It features a modern, responsive UI, secure authentication, group collaboration, and subscription billing.
+**Sidenote** is an AI-powered reader application that enables users to interact with their documents (PDFs, EPUBs) using advanced RAG (Retrieval-Augmented Generation) techniques. It features a modern, responsive UI, secure authentication, group collaboration, and subscription billing.
 
 ## Features
 
@@ -130,7 +130,3 @@ docker run -p 3000:3000 fractal-chat
 ### Vercel
 
 This project is configured for Vercel. Ensure you set the environment variables in your Vercel project settings.
-
----
-
-Built with ❤️ using React Router.
